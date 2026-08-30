@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register a tiny Python provider and render LAE output as ANSI bold."""
+"""Register a tiny Python provider and render LAE output as Markdown bold."""
 
 import argparse
 import ctypes
@@ -190,7 +190,7 @@ def render(source, spans):
     output = bytearray()
     cursor = 0
     for begin, end in spans:
-        output += source[cursor:begin] + b"\x1b[1m" + source[begin:end] + b"\x1b[0m"
+        output += source[cursor:begin] + b"**" + source[begin:end] + b"**"
         cursor = end
     return bytes(output + source[cursor:])
 

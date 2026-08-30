@@ -201,11 +201,11 @@ if(LAE_BUILD_TESTS)
     )
 
     if(BUILD_SHARED_LIBS)
-        add_test(NAME example-terminal-bold
+        add_test(NAME example-markdown-bold
             COMMAND ${Python3_EXECUTABLE}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/terminal_bold.py
+                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/markdown_bold.py
                     --library $<TARGET_FILE:le_runtime>
-                    "Provider APIs can drive terminal emphasis."
+                    "Provider APIs can produce Markdown emphasis."
         )
     endif()
 

@@ -37,18 +37,18 @@ cmake -S . -B build-static -DBUILD_SHARED_LIBS=OFF \
   -DLAE_ENABLE_DYNAMIC_PROVIDERS=OFF
 ```
 
-Run the minimal Python provider and ANSI-terminal renderer against a shared
+Run the minimal Python provider and Markdown renderer against a shared
 build:
 
 ```sh
 cmake -S . -B build-shared -DBUILD_SHARED_LIBS=ON
 cmake --build build-shared
-python3 examples/terminal_bold.py \
-  "Language-aware emphasis works directly in the terminal."
+python3 examples/markdown_bold.py \
+  "Language-aware emphasis works in Markdown output."
 ```
 
 The script implements provider ABI v1 through `ctypes`, registers it with the
-runtime, and keeps terminal styling outside the library.
+runtime, and converts the resulting byte spans into Markdown `**bold**` syntax.
 
 Try the C-ABI-only CLI:
 

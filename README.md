@@ -30,6 +30,24 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Install the runtime and consume its relocatable CMake package:
+
+```sh
+cmake --install build --prefix "$PWD/install"
+```
+
+```cmake
+find_package(le 0.10 CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE le::runtime)
+```
+
+Point `CMAKE_PREFIX_PATH` at the chosen install prefix when configuring the
+consumer. Static packages locate the required `libutf8proc` dependency through
+`pkg-config`; consuming C applications should enable both C and C++ languages
+because the runtime implementation is C++.
+See the [minimal installed-package consumer](examples/cmake-consumer/CMakeLists.txt)
+for a complete target.
+
 For static/mobile/WASM builds without operating-system module loading:
 
 ```sh

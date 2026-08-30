@@ -55,6 +55,7 @@ set_target_properties(le_runtime PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
     POSITION_INDEPENDENT_CODE ON
+    EXPORT_NAME runtime
     VERSION ${PROJECT_VERSION}
     SOVERSION 1
 )
@@ -156,6 +157,17 @@ if(LAE_BUILD_TESTS)
     target_compile_features(le-cpp-abi-test PRIVATE cxx_std_20)
     target_link_libraries(le-cpp-abi-test PRIVATE le::runtime)
     add_test(NAME cpp-abi COMMAND le-cpp-abi-test)
+
+    if(NOT BUILD_SHARED_LIBS)
+        add_test(NAME cmake-package-consumer
+            COMMAND ${CMAKE_COMMAND}
+                    -DLAE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DLAE_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                    -DLAE_CONFIG=$<CONFIG>
+                    -DLAE_CTEST_COMMAND=${CMAKE_CTEST_COMMAND}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake_package_consumer.cmake
+        )
+    endif()
 
     if(LAE_ENABLE_DYNAMIC_PROVIDERS)
         add_library(le-test-provider MODULE tests/plugins/test_provider.c)
@@ -329,11 +341,40 @@ if(LAE_BUILD_TESTS)
 endif()
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+set(LE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/le)
+if(BUILD_SHARED_LIBS)
+    set(LE_PACKAGE_NEEDS_UTF8PROC OFF)
+else()
+    set(LE_PACKAGE_NEEDS_UTF8PROC ON)
+endif()
+
+configure_package_config_file(
+    cmake/leConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/leConfig.cmake
+    INSTALL_DESTINATION ${LE_INSTALL_CMAKEDIR}
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/leConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
 install(TARGETS le_runtime
     EXPORT leTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(EXPORT leTargets
+    FILE leTargets.cmake
+    NAMESPACE le::
+    DESTINATION ${LE_INSTALL_CMAKEDIR}
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/leConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/leConfigVersion.cmake
+    DESTINATION ${LE_INSTALL_CMAKEDIR}
 )
 if(LAE_BUILD_CLI)
     if(APPLE)

@@ -37,6 +37,19 @@ cmake -S . -B build-static -DBUILD_SHARED_LIBS=OFF \
   -DLAE_ENABLE_DYNAMIC_PROVIDERS=OFF
 ```
 
+Run the minimal Python provider and ANSI-terminal renderer against a shared
+build:
+
+```sh
+cmake -S . -B build-shared -DBUILD_SHARED_LIBS=ON
+cmake --build build-shared
+python3 examples/terminal_bold.py \
+  "Language-aware emphasis works directly in the terminal."
+```
+
+The script implements provider ABI v1 through `ctypes`, registers it with the
+runtime, and keeps terminal styling outside the library.
+
 Try the C-ABI-only CLI:
 
 ```sh

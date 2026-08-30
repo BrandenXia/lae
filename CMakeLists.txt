@@ -200,6 +200,15 @@ if(LAE_BUILD_TESTS)
         PASS_REGULAR_EXPRESSION "\"mean_reading_speed_delta\""
     )
 
+    if(BUILD_SHARED_LIBS)
+        add_test(NAME example-terminal-bold
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/terminal_bold.py
+                    --library $<TARGET_FILE:le_runtime>
+                    "Provider APIs can drive terminal emphasis."
+        )
+    endif()
+
     if(LAE_BUILD_CLI)
         add_test(NAME cli-analysis
             COMMAND le-cli --language zh-Hans --dump-analysis

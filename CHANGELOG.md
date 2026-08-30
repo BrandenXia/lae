@@ -6,7 +6,10 @@ model artifact format.
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- Dependency-free Python runtime binding for high-level processing, model
+  loading, metadata discovery, native diagnostics, and explicit ownership.
 
 ## [0.10.0] - 2026-08-30
 

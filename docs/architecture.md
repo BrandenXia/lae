@@ -107,3 +107,8 @@ and language regions. Provider ABI v1 supports static registration everywhere
 and optional module loading on supported hosts. Mixed-language routing and
 streaming remain deferred. English and Chinese exercise structurally different
 uses of the same IR; Japanese remains a future third built-in provider.
+
+The first supported host-language binding lives under `bindings/python`. It is
+a dependency-free wrapper over the shared C ABI, copies immutable emphasis
+plans into Python values, and preserves UTF-8 byte offsets. It neither accesses
+C++ internals nor imports the offline training package.

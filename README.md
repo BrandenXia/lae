@@ -68,6 +68,22 @@ python3 examples/markdown_bold.py \
 The script implements provider ABI v1 through `ctypes`, registers it with the
 runtime, and converts the resulting byte spans into Markdown `**bold**` syntax.
 
+Use the dependency-free Python runtime binding against the same shared build:
+
+```python
+from lae import ProcessOptions, ReadingModel, Runtime
+
+with Runtime("build-shared/lible_runtime.dylib") as runtime:
+    plan = runtime.process(
+        "unbelievable reading",
+        ProcessOptions(language="en", reading_model=ReadingModel.LEXICAL_CORE),
+    )
+```
+
+Set `PYTHONPATH=bindings/python/src` when using the binding from a source
+checkout. See the [Python binding guide](docs/python-binding.md) for model
+loading, ownership, and cross-platform library discovery.
+
 Try the C-ABI-only CLI:
 
 ```sh
@@ -116,6 +132,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [evaluation framework](docs/evaluation.md),
 [learned model](docs/learned-model.md),
 [provider plugin ABI](docs/provider-plugin-abi.md),
+[Python binding](docs/python-binding.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and

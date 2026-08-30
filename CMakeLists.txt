@@ -213,6 +213,13 @@ if(LAE_BUILD_TESTS)
     )
 
     if(BUILD_SHARED_LIBS)
+        add_test(NAME python-runtime-binding
+            COMMAND ${CMAKE_COMMAND} -E env
+                    PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/src
+                    LAE_RUNTIME=$<TARGET_FILE:le_runtime>
+                    ${Python3_EXECUTABLE} -m unittest discover
+                    -s ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/tests -v
+        )
         add_test(NAME example-markdown-bold
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/examples/markdown_bold.py

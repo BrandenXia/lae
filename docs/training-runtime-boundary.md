@@ -19,6 +19,8 @@ package. It provides four explicit boundaries:
 - `evaluate_prefix` and `fit_prefix` measure and optimize a deterministic
   runtime-compatible baseline.
 - the artifact exporter compiles fitted parameters directly to `.lem` v1.
+- plan and study evaluators compare arbitrary named strategies without changing
+  the runtime or artifact contract.
 
 Dataset preprocessing owns linguistic units and true extended-grapheme
 boundaries. Storing absolute boundaries avoids silently reimplementing runtime
@@ -31,6 +33,12 @@ golden checksum test detects encoder drift, while integration tests inspect and
 execute its output with the C++ model tool and C ABI runtime. This is a contract
 test across the boundary, not a runtime dependency on training.
 
-There is no neural model, framework checkpoint, experiment database, or runtime
-Python bridge. Formal multi-strategy evaluation and learned salience models
-remain Milestones 8 and 9.
+Milestone 8 adds two evaluation inputs. Offline plan records measure emphasis
+density, text density, fragmentation, and emphasis transitions. Human-study
+records measure reading speed, comprehension, fixation duration/count,
+regressions, preference, reported distraction, and density. A/B results use
+paired examples and report candidate-minus-baseline descriptive deltas.
+
+There is no neural model, framework checkpoint, experiment database, runtime
+Python bridge, or claim of statistical significance. Learned salience models
+remain Milestone 9.

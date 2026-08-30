@@ -73,6 +73,12 @@ deterministic optimizer can fit the prefix baseline, measure offline error, and
 export `.lem` v1 without importing or linking the runtime. Cross-system tests
 then load that artifact through the production C ABI.
 
+Evaluation remains offline and strategy-neutral. One schema summarizes rendered
+plans using grapheme-index ranges; another records timing, comprehension,
+eye-tracking, preference, distraction, and density measurements. Comparisons
+pair the same example—or participant and example—before reporting
+candidate-minus-baseline deltas. No evaluation code is linked into the runtime.
+
 ## Runtime properties
 
 - Input is borrowed and immutable for the duration of `le_process`.

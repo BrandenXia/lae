@@ -8,9 +8,10 @@ variable-strength presentation. Versioned `.lem` artifacts can now carry model
 parameters and capability metadata into the memory-based runtime loader. An
 independent standard-library Python package can validate offline datasets,
 extract features, optimize a deterministic prefix baseline, evaluate it, and
-export the same artifact format. LAE still intentionally has no renderer,
-runtime training dependency, automatic language detection, neural model, or
-dynamic plugin system.
+export the same artifact format. Its strategy-neutral evaluation layer compares
+offline plan density/complexity and paired human-study outcomes. LAE still
+intentionally has no renderer, runtime training dependency, automatic language
+detection, neural model, or dynamic plugin system.
 
 ## Build and test
 
@@ -42,6 +43,10 @@ printf 'artifact driven' | build/le-cli --artifact build/prefix.lem --language e
 PYTHONPATH=training/src python3 -m lae_training fit-prefix \
   training/tests/fixtures/prefix-training.jsonl build/trained-prefix.lem
 build/le-model inspect build/trained-prefix.lem
+PYTHONPATH=training/src python3 -m lae_training \
+  summarize-plans training/tests/fixtures/plans.jsonl --baseline plain
+PYTHONPATH=training/src python3 -m lae_training \
+  summarize-study training/tests/fixtures/study.jsonl --baseline plain
 ```
 
 The CLI prints ordered, non-overlapping UTF-8 byte ranges or the provider's
@@ -61,6 +66,7 @@ until `le_result_destroy`. Rendering stays in the host application.
 See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [model artifact format](docs/model-format.md),
 [training/runtime boundary](docs/training-runtime-boundary.md),
+[evaluation framework](docs/evaluation.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and

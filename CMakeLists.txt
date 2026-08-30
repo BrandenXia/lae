@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.7.0 LANGUAGES C CXX)
+project(lae VERSION 0.8.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -148,6 +148,26 @@ if(LAE_BUILD_TESTS)
                 PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/training/src
                 ${Python3_EXECUTABLE} -m unittest discover
                 -s ${CMAKE_CURRENT_SOURCE_DIR}/training/tests -v
+    )
+    add_test(NAME training-plan-evaluation
+        COMMAND ${CMAKE_COMMAND} -E env
+                PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/training/src
+                ${Python3_EXECUTABLE} -m lae_training summarize-plans
+                ${CMAKE_CURRENT_SOURCE_DIR}/training/tests/fixtures/plans.jsonl
+                --baseline plain
+    )
+    set_tests_properties(training-plan-evaluation PROPERTIES
+        PASS_REGULAR_EXPRESSION "\"candidate\": \"traditional-prefix\""
+    )
+    add_test(NAME training-study-evaluation
+        COMMAND ${CMAKE_COMMAND} -E env
+                PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/training/src
+                ${Python3_EXECUTABLE} -m lae_training summarize-study
+                ${CMAKE_CURRENT_SOURCE_DIR}/training/tests/fixtures/study.jsonl
+                --baseline plain
+    )
+    set_tests_properties(training-study-evaluation PROPERTIES
+        PASS_REGULAR_EXPRESSION "\"mean_reading_speed_delta\""
     )
 
     if(LAE_BUILD_CLI)

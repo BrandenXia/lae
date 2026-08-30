@@ -11,6 +11,7 @@ neural model:
 - language-neutral scalar feature extraction;
 - prefix-candidate evaluation and grid-search optimization;
 - a pure-Python `.lem` v1 artifact exporter.
+- strategy-neutral offline plan metrics and paired human-study comparisons.
 
 Preprocessing owns linguistic-unit and grapheme discovery. Recording those
 boundaries in the dataset prevents training from silently using segmentation
@@ -50,6 +51,8 @@ From the repository root:
 PYTHONPATH=training/src python3 -m lae_training extract-features DATASET.jsonl
 PYTHONPATH=training/src python3 -m lae_training evaluate-prefix DATASET.jsonl --fixed 2
 PYTHONPATH=training/src python3 -m lae_training fit-prefix DATASET.jsonl model.lem
+PYTHONPATH=training/src python3 -m lae_training summarize-plans PLANS.jsonl
+PYTHONPATH=training/src python3 -m lae_training summarize-study STUDY.jsonl
 ```
 
 `fit-prefix` emits a JSON report and a runtime-loadable artifact. With no
@@ -57,3 +60,10 @@ explicit `--language`, the exporter records the sorted set of dataset language
 tags. The optimizer evaluates fixed counts from zero through the longest unit
 and proportional values from 0.00 through 1.00 in 0.05 steps. Ties are resolved
 deterministically.
+
+Plan evaluation accepts arbitrary variant labels and reports emphasis density,
+text density, fragmentation, and emphasis-transition rate. Study evaluation
+aggregates reading speed, comprehension, fixation duration/count, regressions,
+preference, distraction, and density. Comparisons are paired and always report
+candidate minus baseline. See [the evaluation contract](../docs/evaluation.md)
+for both schemas and metric semantics.

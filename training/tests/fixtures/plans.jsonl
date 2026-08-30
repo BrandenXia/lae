@@ -1,0 +1,6 @@
+{"schema_version":1,"example_id":"example-1","variant":"plain","grapheme_count":10,"line_count":2,"emphasized_ranges":[]}
+{"schema_version":1,"example_id":"example-1","variant":"traditional-prefix","grapheme_count":10,"line_count":2,"emphasized_ranges":[{"begin":0,"end":2},{"begin":5,"end":7}]}
+{"schema_version":1,"example_id":"example-1","variant":"morphological","grapheme_count":10,"line_count":2,"emphasized_ranges":[{"begin":0,"end":3}]}
+{"schema_version":1,"example_id":"example-2","variant":"plain","grapheme_count":6,"line_count":1,"emphasized_ranges":[]}
+{"schema_version":1,"example_id":"example-2","variant":"traditional-prefix","grapheme_count":6,"line_count":1,"emphasized_ranges":[{"begin":0,"end":2}]}
+{"schema_version":1,"example_id":"example-2","variant":"morphological","grapheme_count":6,"line_count":1,"emphasized_ranges":[{"begin":0,"end":3}]}

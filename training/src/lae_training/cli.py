@@ -11,8 +11,11 @@ from pathlib import Path
 from .artifacts import build_prefix_artifact, write_artifact
 from .dataset import DatasetError, JsonlDataset
 from .evaluation import PrefixCandidate, evaluate_prefix
+from .evaluation_records import EvaluationDataError
 from .features import extract_features
 from .optimize import fit_prefix
+from .plan_evaluation import PlanJsonlDataset, aggregate_plans, compare_plans
+from .study_evaluation import StudyJsonlDataset, aggregate_study, compare_study
 
 
 def _dataset(path: str) -> tuple:
@@ -75,6 +78,28 @@ def _fit(arguments: argparse.Namespace) -> None:
     print(json.dumps(report, sort_keys=True))
 
 
+def _summarize_plans(arguments: argparse.Namespace) -> None:
+    records = tuple(PlanJsonlDataset(arguments.plans))
+    report = {
+        "metrics": [item.as_dict() for item in aggregate_plans(records)],
+        "comparisons": [
+            item.as_dict() for item in compare_plans(records, arguments.baseline)
+        ],
+    }
+    print(json.dumps(report, sort_keys=True))
+
+
+def _summarize_study(arguments: argparse.Namespace) -> None:
+    observations = tuple(StudyJsonlDataset(arguments.study))
+    report = {
+        "metrics": [item.as_dict() for item in aggregate_study(observations)],
+        "comparisons": [
+            item.as_dict() for item in compare_study(observations, arguments.baseline)
+        ],
+    }
+    print(json.dumps(report, sort_keys=True))
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="lae-train")
     commands = result.add_subparsers(dest="command", required=True)
@@ -98,6 +123,20 @@ def parser() -> argparse.ArgumentParser:
     fit.add_argument("--language", action="append")
     fit.add_argument("--model-version", type=int, default=1)
     fit.set_defaults(handler=_fit)
+
+    plans = commands.add_parser(
+        "summarize-plans", help="aggregate strategy-neutral offline plan metrics"
+    )
+    plans.add_argument("plans")
+    plans.add_argument("--baseline", default="plain")
+    plans.set_defaults(handler=_summarize_plans)
+
+    study = commands.add_parser(
+        "summarize-study", help="aggregate outcomes and paired A/B comparisons"
+    )
+    study.add_argument("study")
+    study.add_argument("--baseline", default="plain")
+    study.set_defaults(handler=_summarize_study)
     return result
 
 
@@ -106,6 +145,6 @@ def main(argv: list[str] | None = None) -> int:
     try:
         arguments.handler(arguments)
         return 0
-    except (DatasetError, OSError, ValueError) as error:
+    except (DatasetError, EvaluationDataError, OSError, ValueError) as error:
         parser().error(str(error))
     return 2

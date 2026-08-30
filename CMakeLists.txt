@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.6.0 LANGUAGES C CXX)
+project(lae VERSION 0.7.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -60,6 +60,7 @@ endif()
 
 if(LAE_BUILD_TESTS)
     enable_testing()
+    find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 
     add_executable(le-runtime-tests tests/runtime_tests.cpp)
     target_compile_features(le-runtime-tests PRIVATE cxx_std_20)
@@ -142,6 +143,13 @@ if(LAE_BUILD_TESTS)
     target_link_libraries(le-cpp-abi-test PRIVATE le::runtime)
     add_test(NAME cpp-abi COMMAND le-cpp-abi-test)
 
+    add_test(NAME training-unit
+        COMMAND ${CMAKE_COMMAND} -E env
+                PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/training/src
+                ${Python3_EXECUTABLE} -m unittest discover
+                -s ${CMAKE_CURRENT_SOURCE_DIR}/training/tests -v
+    )
+
     if(LAE_BUILD_CLI)
         add_test(NAME cli-analysis
             COMMAND le-cli --language zh-Hans --dump-analysis
@@ -186,6 +194,32 @@ if(LAE_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt)
         set_tests_properties(model-cli-signals PROPERTIES
             DEPENDS model-cli-compile
+            PASS_REGULAR_EXPRESSION "\"fixation_salience\":0.500"
+        )
+        set(LE_TEST_TRAINED_MODEL ${CMAKE_CURRENT_BINARY_DIR}/test-trained-prefix.lem)
+        add_test(NAME training-fit-prefix
+            COMMAND ${CMAKE_COMMAND} -E env
+                    PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/training/src
+                    ${Python3_EXECUTABLE} -m lae_training fit-prefix
+                    ${CMAKE_CURRENT_SOURCE_DIR}/training/tests/fixtures/prefix-training.jsonl
+                    ${LE_TEST_TRAINED_MODEL}
+        )
+        set_tests_properties(training-fit-prefix PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"strategy\": \"fixed\""
+        )
+        add_test(NAME training-model-inspect
+            COMMAND le-model inspect ${LE_TEST_TRAINED_MODEL}
+        )
+        set_tests_properties(training-model-inspect PROPERTIES
+            DEPENDS training-fit-prefix
+            PASS_REGULAR_EXPRESSION "\"fixed_graphemes\":2"
+        )
+        add_test(NAME training-model-runtime
+            COMMAND le-cli --artifact ${LE_TEST_TRAINED_MODEL} --language en --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt
+        )
+        set_tests_properties(training-model-runtime PROPERTIES
+            DEPENDS training-fit-prefix
             PASS_REGULAR_EXPRESSION "\"fixation_salience\":0.500"
         )
     endif()

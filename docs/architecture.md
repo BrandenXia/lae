@@ -2,9 +2,12 @@
 
 ## Dependency direction
 
-The runtime is split into a C ABI facade and a language-independent C++ core:
+The project has an offline training side and an embeddable runtime, joined only
+by the artifact contract:
 
 ```text
+dataset → preprocessing → features → optimization/evaluation → `.lem`
+                                                               ↓
 host / binding / CLI
         ↓
 public C ABI (`include/le`)
@@ -63,6 +66,13 @@ dependency. Loaded prefix artifacts supply strategy parameters; lexical-core
 artifacts declare their required feature ID. Both feed the same reading-signal
 and presentation stages as the compatibility APIs.
 
+The independent `training/` Python package consumes versioned JSON Lines data.
+Preprocessing records provider-neutral unit spans, grapheme boundaries, and
+target prefix counts as UTF-8 byte coordinates. Feature extraction and a small
+deterministic optimizer can fit the prefix baseline, measure offline error, and
+export `.lem` v1 without importing or linking the runtime. Cross-system tests
+then load that artifact through the production C ABI.
+
 ## Runtime properties
 
 - Input is borrowed and immutable for the duration of `le_process`.
@@ -71,6 +81,7 @@ and presentation stages as the compatibility APIs.
 - Analyses, signals, and results remain valid after their runtime is destroyed.
 - Loaded models own parsed metadata and remain valid after runtime destruction.
 - Processing has no global mutable model or provider state and is deterministic.
+- Runtime targets do not import or link any source under `training/`.
 - Diagnostics are thread-local; each thread observes its own most recent error.
 - `utf8proc` supplies standards-based UTF-8 decoding and extended grapheme
   boundary behavior without introducing language-specific rules.

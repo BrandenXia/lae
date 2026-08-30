@@ -5,14 +5,19 @@ milestone provides a stable C ABI, a validated and inspectable linguistic IR,
 a generic Unicode fallback, statically linked rule-based English and Chinese
 providers, prefix and lexical-core reading models, and binary or
 variable-strength presentation. Versioned `.lem` artifacts can now carry model
-parameters and capability metadata into the memory-based runtime loader. LAE
-still intentionally has no renderer, training dependency, automatic language
-detection, or dynamic plugin system.
+parameters and capability metadata into the memory-based runtime loader. An
+independent standard-library Python package can validate offline datasets,
+extract features, optimize a deterministic prefix baseline, evaluate it, and
+export the same artifact format. LAE still intentionally has no renderer,
+runtime training dependency, automatic language detection, neural model, or
+dynamic plugin system.
 
 ## Build and test
 
 LAE requires CMake 3.20+, a C11/C++20 compiler, `pkg-config`, and
-[`utf8proc`](https://github.com/JuliaStrings/utf8proc).
+[`utf8proc`](https://github.com/JuliaStrings/utf8proc). The complete test suite
+also requires Python 3.10+; runtime-only builds with `LAE_BUILD_TESTS=OFF` do
+not require Python.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -34,6 +39,9 @@ printf '研究生命起源' | build/le-cli --language zh-Hans --dump-analysis
 build/le-model compile-prefix build/prefix.lem --fixed 2 --language en
 build/le-model inspect build/prefix.lem
 printf 'artifact driven' | build/le-cli --artifact build/prefix.lem --language en
+PYTHONPATH=training/src python3 -m lae_training fit-prefix \
+  training/tests/fixtures/prefix-training.jsonl build/trained-prefix.lem
+build/le-model inspect build/trained-prefix.lem
 ```
 
 The CLI prints ordered, non-overlapping UTF-8 byte ranges or the provider's
@@ -52,6 +60,7 @@ until `le_result_destroy`. Rendering stays in the host application.
 
 See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [model artifact format](docs/model-format.md),
+[training/runtime boundary](docs/training-runtime-boundary.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and

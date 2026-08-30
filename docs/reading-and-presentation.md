@@ -25,7 +25,9 @@ language-independent, and the generic fallback produces no lexical-core facts.
 The same two models can be loaded from `.lem` artifacts. Prefix artifacts move
 strategy, fixed-count, and proportion parameters out of the runtime call site.
 Lexical-core artifacts declare `LE_FEATURE_LEXICAL_CORE` as a required runtime
-capability. Model language metadata is checked before signal generation.
+capability. Model language metadata is checked before signal generation. The
+offline training skeleton can optimize the prefix parameters against annotated
+unit targets and export them without becoming a runtime dependency.
 
 Signal results are immutable and own contiguous output storage. An advanced
 analysis handle owns one immutable snapshot of its source text, exposed as a

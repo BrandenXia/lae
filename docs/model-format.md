@@ -81,6 +81,10 @@ le-model compile-lexical-core lexical.lem --language en --language zh
 le-model inspect prefix.lem
 ```
 
+The independent Python training exporter implements this written contract
+rather than linking the runtime encoder. Its output is checked against the same
+golden bytes and loaded by `le-model` and the C runtime in integration tests.
+
 Encoding is deterministic. Tests pin header layout, encoded sizes, a golden
 checksum, round trips, corruption handling, future-version rejection, unknown
-feature rejection, and CLI compile/inspect/runtime interoperability.
+feature rejection, training/runtime agreement, and CLI interoperability.

@@ -178,7 +178,8 @@ le::core::PresentationConfig presentation_defaults() {
 }
 
 le::core::PipelineOptions defaults() {
-    return le::core::PipelineOptions{"und", prefix_defaults(), presentation_defaults()};
+    return le::core::PipelineOptions{"und", prefix_defaults(), presentation_defaults(),
+                                     le::core::ReadingModelKind::prefix};
 }
 
 le_status_t read_prefix_config(const le_prefix_model_config_t* source,
@@ -255,6 +256,10 @@ le_status_t read_options(const le_process_options_t* source, le::core::PipelineO
         source->struct_size < LE_PROCESS_OPTIONS_V2_SIZE) {
         return invalid_argument("process options struct_size is between known ABI versions");
     }
+    if (source->struct_size > LE_PROCESS_OPTIONS_V2_SIZE &&
+        source->struct_size < LE_PROCESS_OPTIONS_V3_SIZE) {
+        return invalid_argument("process options struct_size is between known ABI versions");
+    }
     if (source->flags != 0) {
         return invalid_argument("process options contain unsupported flags");
     }
@@ -282,9 +287,29 @@ le_status_t read_options(const le_process_options_t* source, le::core::PipelineO
     target.presentation = presentation_defaults();
     target.presentation.maximum_strength = source->emphasis_strength;
     if (source->struct_size >= LE_PROCESS_OPTIONS_V2_SIZE) {
-        return validate_presentation(source->presentation_policy, source->salience_threshold,
-                                     source->minimum_emphasis_strength, source->emphasis_strength,
-                                     target.presentation);
+        const auto status = validate_presentation(
+            source->presentation_policy, source->salience_threshold,
+            source->minimum_emphasis_strength, source->emphasis_strength, target.presentation);
+        if (status != LE_OK) {
+            return status;
+        }
+    }
+    if (source->struct_size >= LE_PROCESS_OPTIONS_V3_SIZE) {
+#if UINTPTR_MAX > UINT32_MAX
+        if (source->reserved_v2 != 0) {
+            return invalid_argument("process options contain unsupported reserved fields");
+        }
+#endif
+        if (source->reserved_v3 != 0) {
+            return invalid_argument("process options contain unsupported reserved fields");
+        }
+        if (source->reading_model != LE_READING_MODEL_PREFIX &&
+            source->reading_model != LE_READING_MODEL_LEXICAL_CORE) {
+            return invalid_argument("reading model is not recognized");
+        }
+        target.reading_model = source->reading_model == LE_READING_MODEL_LEXICAL_CORE
+                                   ? le::core::ReadingModelKind::lexical_core
+                                   : le::core::ReadingModelKind::prefix;
     }
     return LE_OK;
 }
@@ -301,16 +326,14 @@ void le_runtime_config_init(le_runtime_config_t* config) {
 
 void le_process_options_init(le_process_options_t* options) {
     if (options != nullptr) {
-        *options = le_process_options_t{LE_PROCESS_OPTIONS_V2_SIZE,
-                                        0,
-                                        le_string_view_t{nullptr, 0},
-                                        LE_PREFIX_PROPORTIONAL,
-                                        1,
-                                        0.5F,
-                                        1.0F,
-                                        LE_POLICY_BINARY,
-                                        0.0F,
-                                        0.0F};
+        *options = le_process_options_t{};
+        options->struct_size = LE_PROCESS_OPTIONS_V3_SIZE;
+        options->prefix_strategy = LE_PREFIX_PROPORTIONAL;
+        options->fixed_graphemes = 1;
+        options->prefix_proportion = 0.5F;
+        options->emphasis_strength = 1.0F;
+        options->presentation_policy = LE_POLICY_BINARY;
+        options->reading_model = LE_READING_MODEL_PREFIX;
     }
 }
 
@@ -476,6 +499,40 @@ le_status_t le_generate_prefix_signals(le_runtime_t* runtime, const le_analysis_
         return LE_ERROR_INTERNAL;
     } catch (...) {
         set_error("unexpected failure while generating reading signals");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+le_status_t le_generate_lexical_core_signals(le_runtime_t* runtime, const le_analysis_t* analysis,
+                                             le_signal_result_t** out_signals) {
+    if (out_signals == nullptr) {
+        return invalid_argument("out_signals is null");
+    }
+    *out_signals = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (analysis == nullptr) {
+        return invalid_argument("analysis is null");
+    }
+    try {
+        const std::string_view bytes(analysis->text);
+        const le::core::Text core_text(bytes);
+        le::core::validate_analysis(core_text, analysis->core);
+        auto signals = make_signals(le::core::LexicalCoreReadingModel().generate(analysis->core));
+        *out_signals = signals.release();
+        return LE_OK;
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate lexical-core reading signals");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while generating lexical-core reading signals");
         return LE_ERROR_INTERNAL;
     }
 }

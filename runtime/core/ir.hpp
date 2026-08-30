@@ -32,6 +32,10 @@ enum class NodeKind : std::uint8_t {
 using FeatureId = std::uint32_t;
 inline constexpr FeatureId feature_boundary_strength = 0x00000001u;
 inline constexpr FeatureId feature_grapheme_count = 0x00000002u;
+inline constexpr FeatureId feature_lexical_core = 0x00010001u;
+inline constexpr FeatureId feature_derivational_affix = 0x00010002u;
+inline constexpr FeatureId feature_grammatical_affix = 0x00010003u;
+inline constexpr FeatureId feature_content_unit = 0x00030001u;
 
 struct Feature {
     FeatureId id;

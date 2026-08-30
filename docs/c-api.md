@@ -28,6 +28,7 @@ reordered or reinterpreted within ABI major version 1.
 | `le_analysis_*_data` | Null/empty returns null; arrays and language bytes are borrowed | Safe | Views last until analysis destruction |
 | `le_analysis_destroy` | Null accepted; consumes analysis and nested storage | Safe for an unshared handle | No failure |
 | `le_generate_prefix_signals` | Runtime, analysis, and output required; config may be null | Concurrent calls are safe | Caller owns signal result; writes null before failure |
+| `le_generate_lexical_core_signals` | Runtime, analysis, and output required | Concurrent calls are safe | Caller owns signal result; writes null before failure |
 | `le_signal_result_*` | Null counts as empty; returned array is borrowed | Safe | Views last until signal-result destruction |
 | `le_generate_emphasis` | Runtime, signals, and output required; config may be null | Concurrent calls are safe | Caller owns result; writes null before failure |
 | `le_process` | Runtime and output pointer required; text/options borrowed only during call; caller owns result | Concurrent calls are safe | Returns status; writes null before failure |
@@ -48,19 +49,24 @@ With null options, processing uses generic analysis, a proportional prefix of
 `fixed_graphemes`; `LE_PREFIX_PROPORTIONAL` uses a finite proportion in `[0,1]`.
 Strength must also be finite and normalized to `[0,1]`.
 
-Process options v2 append presentation policy, minimum strength, and salience
-threshold fields. `LE_PROCESS_OPTIONS_V1_SIZE` remains the original v1 size;
-the runtime never reads v2 fields from a v1-sized caller. The initializer emits
-the latest v2 size. Binary policy is the compatibility default.
+Process options v2 appended presentation policy, minimum strength, and salience
+threshold fields. V3 appends `reading_model`. `LE_PROCESS_OPTIONS_V1_SIZE` and
+`LE_PROCESS_OPTIONS_V2_SIZE` remain their historical boundaries; the runtime
+never reads fields beyond the caller's declared version. The initializer emits
+the latest v3 size. Binary policy and `LE_READING_MODEL_PREFIX` are compatibility
+defaults. On 64-bit targets, an explicit reserved field occupies v2's historical
+tail padding so the v2 and v3 size boundaries remain distinguishable.
 
 `language` is a non-null-terminated borrowed BCP-47-compatible byte view. The
-generic fallback records it as region metadata but does not interpret it.
-Empty language means `und`. This preserves explicit routing information without
-putting language behavior in the core.
+router selects the English provider for `en` and `en-*`; the generic fallback
+records all other tags as region metadata but does not interpret them. Empty
+language means `und`. This preserves explicit routing information without
+putting language behavior in the core. There is no automatic or mixed-language
+detection in this version.
 
 ## Analysis representation
 
-`le_analyze` runs the generic provider independently of reading and presentation
+`le_analyze` runs the routed provider independently of reading and presentation
 stages. An analysis owns an immutable source-text snapshot plus four contiguous
 arrays:
 
@@ -70,9 +76,10 @@ arrays:
 - language regions whose language byte views are analysis-owned.
 
 Node kinds are generic structural categories. Feature IDs are extensible
-32-bit identifiers; v1 defines `LE_FEATURE_BOUNDARY_STRENGTH` and
-`LE_FEATURE_GRAPHEME_COUNT` in the stable core range. Unknown feature IDs must
-be preserved or ignored rather than treated as errors by consumers.
+32-bit identifiers. ABI 1.3 defines boundary strength, grapheme count, lexical
+core, derivational affix, grammatical affix, and content-unit features. Unknown
+feature IDs must be preserved or ignored rather than treated as errors by
+consumers.
 
 Feature namespaces begin at `0x00000000` (core), `0x00010000` (morphology),
 `0x00020000` (syntax), `0x00030000` (semantic), `0x00040000` (script), and
@@ -85,6 +92,11 @@ numerical signals without choosing typography. The analysis owns an immutable
 source-text snapshot, available through `le_analysis_text`, so bindings do not
 need to preserve or resupply the input buffer. The signal result owns a
 contiguous `le_reading_signal_t` array.
+
+`le_generate_lexical_core_signals` emits one normalized signal for each
+subunit carrying `LE_FEATURE_LEXICAL_CORE`. The same selection is available to
+high-level processing through `LE_READING_MODEL_LEXICAL_CORE`; older option
+layouts and null options use `LE_READING_MODEL_PREFIX`.
 
 `le_generate_emphasis` consumes those immutable signals with either
 `LE_POLICY_BINARY` or `LE_POLICY_VARIABLE_STRENGTH`. Binary policy emits the

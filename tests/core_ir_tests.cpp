@@ -1,6 +1,6 @@
 #include "core/ir.hpp"
-#include "core/language.hpp"
 #include "core/text.hpp"
+#include "providers/generic/generic_provider.hpp"
 
 #include <cstdlib>
 #include <iostream>

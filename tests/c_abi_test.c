@@ -11,7 +11,9 @@ _Static_assert(sizeof(le_reading_signal_t) == 32, "reading signal ABI layout cha
 _Static_assert(offsetof(le_analysis_node_t, span) == 8, "analysis node ABI layout changed");
 _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, presentation_policy),
                "v1 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 2u), "unexpected ABI version");
+_Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
+               "v2 process options size changed");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 3u), "unexpected ABI version");
 
 typedef struct le_process_options_v1_fixture {
     uint32_t struct_size;
@@ -23,8 +25,23 @@ typedef struct le_process_options_v1_fixture {
     float emphasis_strength;
 } le_process_options_v1_fixture_t;
 
+typedef struct le_process_options_v2_fixture {
+    uint32_t struct_size;
+    uint32_t flags;
+    le_string_view_t language;
+    le_prefix_strategy_t prefix_strategy;
+    uint32_t fixed_graphemes;
+    float prefix_proportion;
+    float emphasis_strength;
+    le_presentation_policy_t presentation_policy;
+    float minimum_emphasis_strength;
+    float salience_threshold;
+} le_process_options_v2_fixture_t;
+
 _Static_assert(sizeof(le_process_options_v1_fixture_t) == LE_PROCESS_OPTIONS_V1_SIZE,
                "legacy process-options fixture does not match ABI v1");
+_Static_assert(sizeof(le_process_options_v2_fixture_t) == LE_PROCESS_OPTIONS_V2_SIZE,
+               "legacy process-options fixture does not match ABI v2");
 
 #define CHECK(condition)                                                                           \
     do {                                                                                           \
@@ -40,7 +57,9 @@ int main(void) {
     le_runtime_t* runtime = NULL;
     le_result_t* result = NULL;
     le_analysis_t* analysis = NULL;
+    le_analysis_t* english_analysis = NULL;
     le_signal_result_t* signals = NULL;
+    le_signal_result_t* lexical_signals = NULL;
     le_result_t* staged_result = NULL;
     le_result_t* legacy_result = NULL;
     const char input[] = "hello 世界";
@@ -81,8 +100,21 @@ int main(void) {
         legacy_result = NULL;
     }
 
+    {
+        const le_process_options_v2_fixture_t legacy = {
+            LE_PROCESS_OPTIONS_V2_SIZE,  0,     {NULL, 0}, LE_PREFIX_FIXED, 1, 0.5F, 0.75F,
+            LE_POLICY_VARIABLE_STRENGTH, 0.25F, 0.0F,
+        };
+        CHECK(le_process(runtime, (le_string_view_t){input, sizeof(input) - 1},
+                         (const le_process_options_t*)&legacy, &legacy_result) == LE_OK);
+        CHECK(le_result_emphasis_count(legacy_result) == 2);
+        CHECK(le_result_emphasis_data(legacy_result)[0].strength == 0.75F);
+        le_result_destroy(legacy_result);
+        legacy_result = NULL;
+    }
+
     CHECK(le_analyze(runtime, (le_string_view_t){input, sizeof(input) - 1},
-                     (le_string_view_t){"en-US", 5}, &analysis) == LE_OK);
+                     (le_string_view_t){NULL, 0}, &analysis) == LE_OK);
     CHECK(le_analysis_node_count(analysis) == 3);
     CHECK(le_analysis_child_count(analysis) == 2);
     CHECK(le_analysis_feature_count(analysis) == 5);
@@ -91,8 +123,8 @@ int main(void) {
     CHECK(nodes[0].child_count == 2 && nodes[1].kind == LE_NODE_UNIT);
     CHECK(le_analysis_language_region_count(analysis) == 1);
     regions = le_analysis_language_region_data(analysis);
-    CHECK(regions != NULL && regions[0].language.size == 5);
-    CHECK(memcmp(regions[0].language.data, "en-US", 5) == 0);
+    CHECK(regions != NULL && regions[0].language.size == 3);
+    CHECK(memcmp(regions[0].language.data, "und", 3) == 0);
 
     model_config.strategy = LE_PREFIX_FIXED;
     model_config.fixed_graphemes = 2;
@@ -122,12 +154,29 @@ int main(void) {
     CHECK(data[0].strength == 1.0F);
     CHECK(data[1].strength > 0.59F && data[1].strength < 0.61F);
 
+    {
+        const char english[] = "unbelievable reading";
+        CHECK(le_analyze(runtime, (le_string_view_t){english, sizeof(english) - 1},
+                         (le_string_view_t){"en", 2}, &english_analysis) == LE_OK);
+        CHECK(le_analysis_node_count(english_analysis) == 9);
+        CHECK(le_generate_lexical_core_signals(runtime, english_analysis, &lexical_signals) ==
+              LE_OK);
+        CHECK(le_signal_result_count(lexical_signals) == 2);
+        signal_data = le_signal_result_data(lexical_signals);
+        CHECK(signal_data[0].span.begin == 2 && signal_data[0].span.end == 8);
+        CHECK(signal_data[0].lexical_salience == 1.0F);
+        CHECK(signal_data[1].span.begin == 13 && signal_data[1].span.end == 17);
+    }
+
     le_runtime_destroy(runtime);
     CHECK(le_result_emphasis_count(result) == 2);
     CHECK(le_analysis_node_count(analysis) == 3);
     CHECK(le_signal_result_count(signals) == 4);
+    CHECK(le_signal_result_count(lexical_signals) == 2);
     le_result_destroy(staged_result);
+    le_signal_result_destroy(lexical_signals);
     le_signal_result_destroy(signals);
+    le_analysis_destroy(english_analysis);
     le_analysis_destroy(analysis);
     le_result_destroy(result);
     return 0;

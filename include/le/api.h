@@ -46,15 +46,22 @@ typedef struct le_process_options {
     le_presentation_policy_t presentation_policy;
     float minimum_emphasis_strength;
     float salience_threshold;
+#if UINTPTR_MAX > UINT32_MAX
+    /* Occupies the historical v2 tail padding on 64-bit ABIs. */
+    uint32_t reserved_v2;
+#endif
+    le_reading_model_t reading_model;
+    uint32_t reserved_v3;
 } le_process_options_t;
 
 #define LE_PROCESS_OPTIONS_V1_SIZE ((uint32_t)offsetof(le_process_options_t, presentation_policy))
-#define LE_PROCESS_OPTIONS_V2_SIZE ((uint32_t)sizeof(le_process_options_t))
+#define LE_PROCESS_OPTIONS_V2_SIZE ((uint32_t)offsetof(le_process_options_t, reading_model))
+#define LE_PROCESS_OPTIONS_V3_SIZE ((uint32_t)sizeof(le_process_options_t))
 
 /* Initialize a v1 configuration with default values. */
 LE_API void le_runtime_config_init(le_runtime_config_t* config);
 
-/* Initialize the latest options: generic analysis, 50% prefix, binary strength 1.0. */
+/* Initialize the latest options: routed analysis, 50% prefix, binary strength 1.0. */
 LE_API void le_process_options_init(le_process_options_t* options);
 
 /* Initialize a v1 prefix model configuration with a 50% proportional prefix. */
@@ -70,8 +77,9 @@ LE_API le_status_t le_runtime_create(const le_runtime_config_t* config, le_runti
 LE_API void le_runtime_destroy(le_runtime_t* runtime);
 
 /*
- * Analyze UTF-8 text with the generic provider. Text and language are borrowed
- * only for this call. Empty language means "und". The caller owns out_analysis.
+ * Analyze UTF-8 text with the provider selected by language. Text and language
+ * are borrowed only for this call. Empty language means "und". The caller owns
+ * out_analysis.
  */
 LE_API le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text,
                               le_string_view_t language, le_analysis_t** out_analysis);
@@ -97,6 +105,9 @@ LE_API void le_analysis_destroy(le_analysis_t* analysis);
 LE_API le_status_t le_generate_prefix_signals(le_runtime_t* runtime, const le_analysis_t* analysis,
                                               const le_prefix_model_config_t* config,
                                               le_signal_result_t** out_signals);
+LE_API le_status_t le_generate_lexical_core_signals(le_runtime_t* runtime,
+                                                    const le_analysis_t* analysis,
+                                                    le_signal_result_t** out_signals);
 LE_API size_t le_signal_result_count(const le_signal_result_t* signals);
 LE_API const le_reading_signal_t* le_signal_result_data(const le_signal_result_t* signals);
 LE_API void le_signal_result_destroy(le_signal_result_t* signals);
@@ -107,7 +118,7 @@ LE_API le_status_t le_generate_emphasis(le_runtime_t* runtime, const le_signal_r
                                         le_result_t** out_result);
 
 /*
- * Process UTF-8 text using generic Unicode analysis. options may be NULL.
+ * Process UTF-8 text using routed language analysis. options may be NULL.
  * Text is borrowed only for this call. On success, the caller owns out_result.
  */
 LE_API le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,

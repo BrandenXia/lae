@@ -47,6 +47,33 @@ int main() {
     check(near(variable[1].strength, 0.8F), "variable policy interpolates middle salience");
     check(near(variable[2].strength, 0.6F), "variable policy maps threshold salience");
 
+    const Analysis analysis{
+        {
+            {NodeId(0),
+             TextSpan(ByteOffset(0), ByteOffset(8)),
+             NodeKind::document,
+             {NodeId(1), NodeId(2)},
+             {}},
+            {NodeId(1),
+             TextSpan(ByteOffset(0), ByteOffset(4)),
+             NodeKind::subunit,
+             {},
+             {{feature_lexical_core, 1.0F}}},
+            {NodeId(2),
+             TextSpan(ByteOffset(4), ByteOffset(8)),
+             NodeKind::subunit,
+             {},
+             {{feature_grammatical_affix, 1.0F}}},
+        },
+        {},
+    };
+    const auto lexical = LexicalCoreReadingModel().generate(analysis);
+    check(lexical.size() == 1, "lexical-core model selects only marked subunits");
+    check(lexical[0].span.begin().value() == 0 && lexical[0].span.end().value() == 4,
+          "lexical-core model preserves provider span");
+    check(near(lexical[0].fixation_salience, 1.0F) && near(lexical[0].lexical_salience, 1.0F),
+          "lexical-core model emits normalized reading signals");
+
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";
         return EXIT_FAILURE;

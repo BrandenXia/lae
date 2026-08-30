@@ -11,12 +11,8 @@ namespace le::core {
 class LanguageProvider {
   public:
     virtual ~LanguageProvider() = default;
+    [[nodiscard]] virtual bool supports(std::string_view language) const = 0;
     [[nodiscard]] virtual Analysis analyze(const Text& text, std::string_view language) const = 0;
-};
-
-class GenericLanguageProvider final : public LanguageProvider {
-  public:
-    [[nodiscard]] Analysis analyze(const Text& text, std::string_view language) const override;
 };
 
 } // namespace le::core

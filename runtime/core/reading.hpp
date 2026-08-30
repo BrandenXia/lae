@@ -27,6 +27,11 @@ struct PrefixModelConfig {
     float proportion;
 };
 
+enum class ReadingModelKind : std::uint8_t {
+    prefix,
+    lexical_core,
+};
+
 class PrefixReadingModel {
   public:
     explicit PrefixReadingModel(PrefixModelConfig config) : config_(config) {}
@@ -35,6 +40,11 @@ class PrefixReadingModel {
 
   private:
     PrefixModelConfig config_;
+};
+
+class LexicalCoreReadingModel {
+  public:
+    [[nodiscard]] std::vector<ReadingSignal> generate(const Analysis& analysis) const;
 };
 
 } // namespace le::core

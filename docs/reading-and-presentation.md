@@ -11,10 +11,15 @@ numerical signals + policy → normalized emphasis plan
 
 `le_reading_signal_t` contains a grapheme-safe UTF-8 byte span and independent
 normalized channels for fixation salience, lexical salience, and reading
-difficulty. The deterministic prefix model currently populates fixation
-salience only. It emits one signal per selected grapheme, declining linearly
+difficulty. The deterministic prefix model populates fixation salience only. It
+emits one signal per selected grapheme, declining linearly
 from `1.0` to `0.5` across a multi-grapheme prefix. This is a baseline heuristic,
 not a typography decision or a learned prediction.
+
+The lexical-core model selects subunit nodes carrying
+`LE_FEATURE_LEXICAL_CORE` and emits one whole-span signal with fixation and
+lexical salience set to `1.0`. The model is language-independent: providers are
+responsible for producing the feature, and the generic fallback produces none.
 
 Signal results are immutable and own contiguous output storage. An advanced
 analysis handle owns one immutable snapshot of its source text, exposed as a
@@ -39,6 +44,7 @@ contrast, decoration, or another host-specific presentation.
 ## Configuration compatibility
 
 Dedicated prefix-model and presentation configurations are independently
-versioned with `struct_size`. High-level `le_process_options_t` v2 appends the
-policy fields to its v1 layout. ABI 1.2 accepts both sizes, uses binary policy
-for v1 callers, and never reads appended fields from a v1 buffer.
+versioned with `struct_size`. High-level `le_process_options_t` v2 appended the
+policy fields to its v1 layout; v3 appends reading-model selection. ABI 1.3
+accepts all three exact legacy boundaries, defaults older callers to the prefix
+model, and never reads appended fields from a smaller buffer.

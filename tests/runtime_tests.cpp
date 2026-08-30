@@ -133,6 +133,27 @@ void contract_tests() {
     check(threshold_result.size() == 1 && threshold_result[0].span.end == 2,
           "binary policy applies salience threshold before merging");
 
+    le_process_options_t lexical_core;
+    le_process_options_init(&lexical_core);
+    lexical_core.language = le_string_view_t{"en", 2};
+    lexical_core.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+    expect_spans("English lexical cores", "unbelievable reading", {{2, 8}, {13, 17}},
+                 &lexical_core);
+
+    le_process_options_t legacy_v2;
+    le_process_options_init(&legacy_v2);
+    legacy_v2.struct_size = LE_PROCESS_OPTIONS_V2_SIZE;
+    legacy_v2.language = le_string_view_t{"en", 2};
+    legacy_v2.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+    expect_spans("v2 ignores reading model", "reading", {{0, 4}}, &legacy_v2);
+
+    le_process_options_t invalid_model;
+    le_process_options_init(&invalid_model);
+    invalid_model.reading_model = 999;
+    le_status_t invalid_model_status = LE_OK;
+    run("reading", &invalid_model, &invalid_model_status);
+    check(invalid_model_status == LE_ERROR_INVALID_ARGUMENT, "invalid reading model rejected");
+
     const std::string invalid("\xF0\x28\x8C\x28", 4);
     le_status_t invalid_status = LE_OK;
     const auto invalid_output = run(invalid, nullptr, &invalid_status);

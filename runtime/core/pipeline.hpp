@@ -15,6 +15,7 @@ struct PipelineOptions {
     std::string_view language;
     PrefixModelConfig prefix;
     PresentationConfig presentation;
+    ReadingModelKind reading_model;
 };
 
 [[nodiscard]] Analysis analyze(const Text& text, std::string_view language);

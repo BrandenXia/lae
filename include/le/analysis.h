@@ -30,6 +30,10 @@ typedef uint32_t le_feature_id_t;
 
 #define LE_FEATURE_BOUNDARY_STRENGTH ((le_feature_id_t)0x00000001u)
 #define LE_FEATURE_GRAPHEME_COUNT ((le_feature_id_t)0x00000002u)
+#define LE_FEATURE_LEXICAL_CORE ((le_feature_id_t)0x00010001u)
+#define LE_FEATURE_DERIVATIONAL_AFFIX ((le_feature_id_t)0x00010002u)
+#define LE_FEATURE_GRAMMATICAL_AFFIX ((le_feature_id_t)0x00010003u)
+#define LE_FEATURE_CONTENT_UNIT ((le_feature_id_t)0x00030001u)
 
 /*
  * A node in an immutable analysis. Child and feature ranges index the arrays

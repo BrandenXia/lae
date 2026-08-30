@@ -1,4 +1,4 @@
-#include "core/language.hpp"
+#include "providers/generic/generic_provider.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -30,6 +30,8 @@ bool is_unit_separator(std::int32_t code_point) {
 }
 
 } // namespace
+
+bool GenericLanguageProvider::supports(std::string_view) const { return true; }
 
 Analysis GenericLanguageProvider::analyze(const Text& text, std::string_view language) const {
     Analysis result;

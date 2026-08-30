@@ -7,6 +7,7 @@
 
 static void usage(FILE* stream) {
     fputs("Usage: le-cli [--language TAG] [--dump-analysis | --dump-signals]\n"
+          "              [--model prefix|lexical-core]\n"
           "              [--fixed N | --proportion P] [--policy binary|variable]\n"
           "              [--threshold S] [--min-strength S] [--strength S] [FILE]\n"
           "Reads UTF-8 from FILE or stdin and prints JSON for the selected stage.\n",
@@ -198,6 +199,16 @@ int main(int argc, char** argv) {
                 fputs("Policy must be binary or variable.\n", stderr);
                 return 2;
             }
+        } else if (strcmp(argv[index], "--model") == 0 && index + 1 < argc) {
+            const char* model = argv[++index];
+            if (strcmp(model, "prefix") == 0) {
+                options.reading_model = LE_READING_MODEL_PREFIX;
+            } else if (strcmp(model, "lexical-core") == 0) {
+                options.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+            } else {
+                fputs("Model must be prefix or lexical-core.\n", stderr);
+                return 2;
+            }
         } else if (strcmp(argv[index], "--language") == 0 && index + 1 < argc) {
             const char* language = argv[++index];
             options.language = (le_string_view_t){language, strlen(language)};
@@ -253,12 +264,16 @@ int main(int argc, char** argv) {
     }
 
     if (dump_signals) {
-        le_prefix_model_config_t model_config;
-        le_prefix_model_config_init(&model_config);
-        model_config.strategy = options.prefix_strategy;
-        model_config.fixed_graphemes = options.fixed_graphemes;
-        model_config.proportion = options.prefix_proportion;
-        status = le_generate_prefix_signals(runtime, analysis, &model_config, &signals);
+        if (options.reading_model == LE_READING_MODEL_LEXICAL_CORE) {
+            status = le_generate_lexical_core_signals(runtime, analysis, &signals);
+        } else {
+            le_prefix_model_config_t model_config;
+            le_prefix_model_config_init(&model_config);
+            model_config.strategy = options.prefix_strategy;
+            model_config.fixed_graphemes = options.fixed_graphemes;
+            model_config.proportion = options.prefix_proportion;
+            status = le_generate_prefix_signals(runtime, analysis, &model_config, &signals);
+        }
         if (status != LE_OK) {
             le_string_view_t detail = le_runtime_last_error(runtime);
             fprintf(stderr, "Signal generation failed: %s: %.*s\n", le_status_string(status),

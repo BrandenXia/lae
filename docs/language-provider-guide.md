@@ -3,8 +3,10 @@
 Language providers answer “what structure and features exist in this text?”
 They must not emit bold spans, font weights, HTML, or presentation styles.
 
-The internal `LanguageProvider` contract currently accepts validated immutable
-text plus advisory language metadata and returns a core-owned `Analysis`.
+The internal `LanguageProvider` contract accepts validated immutable text plus
+advisory language metadata. Providers declare whether they support a language
+tag and return a core-owned `Analysis`. The internal router currently chooses
+English for `en` and `en-*`, then falls back to generic analysis.
 Provider output must obey these invariants:
 
 - every span uses half-open UTF-8 byte offsets into the original input;
@@ -18,11 +20,13 @@ their analysis however they prefer, but invalid graphs never reach reading
 models or the public analysis handle.
 
 The generic provider is always available as fallback and makes no morphology
-claims. External NLP libraries must be wrapped inside concrete providers; the
+claims. The current English implementation lives under
+`runtime/providers/english`, keeping token and affix rules out of the core.
+External NLP libraries must likewise be wrapped inside concrete providers; the
 runtime core may not depend on them.
 
 A sink-based plugin ABI and dynamic loading are postponed until the abstraction
-has been exercised by the generic provider, English, and Chinese or Japanese.
+has also been exercised by Chinese or Japanese.
 At that point, the core should validate sink events and own the resulting graph
 and storage. Static provider registration must remain possible for iOS, WASM,
 and embedded builds.

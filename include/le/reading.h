@@ -13,6 +13,10 @@ typedef uint32_t le_prefix_strategy_t;
 #define LE_PREFIX_PROPORTIONAL ((le_prefix_strategy_t)1u)
 #define LE_PREFIX_FIXED ((le_prefix_strategy_t)2u)
 
+typedef uint32_t le_reading_model_t;
+#define LE_READING_MODEL_PREFIX ((le_reading_model_t)1u)
+#define LE_READING_MODEL_LEXICAL_CORE ((le_reading_model_t)2u)
+
 typedef struct le_prefix_model_config {
     uint32_t struct_size;
     uint32_t flags;

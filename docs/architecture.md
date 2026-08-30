@@ -22,11 +22,21 @@ emphasis. Rendering is outside the library.
 
 ## Milestone implementation
 
+The language router selects the statically linked English provider for explicit
+`en` and `en-*` tags and otherwise selects the generic provider. The core owns
+the router and provider-neutral contract, but contains no English token or
+morphology rules.
+
 The generic provider groups maximal runs of grapheme clusters separated by
 Unicode separator, control, or punctuation categories. This is only a fallback
 segmentation strategy. It is deliberately not whitespace tokenization and does
 not claim linguistic word boundaries. A Chinese or Japanese provider can later
 emit different units without changing the pipeline or C processing API.
+
+The English provider emits document, sentence, unit, and subunit structure. A
+small deterministic ruleset labels lexical cores and grammatical or
+derivational affixes. It is a framework-validation baseline, not a general
+morphological analyzer; its limitations are documented separately.
 
 Provider output is validated before it reaches a reading model. Validation
 checks the document root, dense node identifiers, single-parent tree structure,
@@ -34,10 +44,12 @@ ordered non-overlapping siblings, contained grapheme-safe spans, finite unique
 features, and ordered language regions with normalized confidence.
 
 The prefix reading model chooses a fixed count or proportion of graphemes from
-each generic unit and emits per-grapheme fixation-salience signals. Presentation
-is a separate stage: the binary policy thresholds and merges signals at one
-strength, while the variable policy interpolates strength from salience. Output
-spans remain ordered and non-overlapping.
+each unit and emits per-grapheme fixation-salience signals. The lexical-core
+model consumes only stable IR feature IDs and emits lexical/fixation signals for
+marked subunits; it contains no English rules. Presentation is a separate
+stage: the binary policy thresholds and merges signals at one strength, while
+the variable policy interpolates strength from salience. Output spans remain
+ordered and non-overlapping.
 
 ## Runtime properties
 
@@ -51,6 +63,6 @@ spans remain ordered and non-overlapping.
   boundary behavior without introducing language-specific rules.
 
 The C ABI exposes immutable flat views of nodes, child identifiers, features,
-and language regions. Dynamic providers, stable plugin ABI, artifact loading,
-and streaming remain deferred until multiple structurally different providers
-validate their abstractions.
+and language regions. Dynamic providers, a stable plugin ABI, artifact loading,
+mixed-language routing, and streaming remain deferred until additional
+structurally different providers validate their abstractions.

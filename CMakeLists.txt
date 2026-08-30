@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.3.0 LANGUAGES C CXX)
+project(lae VERSION 0.4.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -12,10 +12,12 @@ add_library(le_runtime
     runtime/abi/api.cpp
     runtime/core/emphasis.cpp
     runtime/core/ir.cpp
-    runtime/core/language.cpp
+    runtime/core/language_router.cpp
     runtime/core/pipeline.cpp
     runtime/core/reading.cpp
     runtime/core/text.cpp
+    runtime/providers/english/english_provider.cpp
+    runtime/providers/generic/generic_provider.cpp
 )
 add_library(le::runtime ALIAS le_runtime)
 
@@ -64,8 +66,8 @@ if(LAE_BUILD_TESTS)
     add_executable(le-core-ir-tests
         tests/core_ir_tests.cpp
         runtime/core/ir.cpp
-        runtime/core/language.cpp
         runtime/core/text.cpp
+        runtime/providers/generic/generic_provider.cpp
     )
     target_compile_features(le-core-ir-tests PRIVATE cxx_std_20)
     target_include_directories(le-core-ir-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
@@ -75,10 +77,24 @@ if(LAE_BUILD_TESTS)
     add_executable(le-core-policy-tests
         tests/core_policy_tests.cpp
         runtime/core/emphasis.cpp
+        runtime/core/reading.cpp
+        runtime/core/text.cpp
     )
     target_compile_features(le-core-policy-tests PRIVATE cxx_std_20)
     target_include_directories(le-core-policy-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+    target_link_libraries(le-core-policy-tests PRIVATE PkgConfig::UTF8PROC)
     add_test(NAME core-policy COMMAND le-core-policy-tests)
+
+    add_executable(le-core-english-tests
+        tests/core_english_tests.cpp
+        runtime/core/ir.cpp
+        runtime/core/text.cpp
+        runtime/providers/english/english_provider.cpp
+    )
+    target_compile_features(le-core-english-tests PRIVATE cxx_std_20)
+    target_include_directories(le-core-english-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+    target_link_libraries(le-core-english-tests PRIVATE PkgConfig::UTF8PROC)
+    add_test(NAME core-english COMMAND le-core-english-tests)
 
     add_executable(le-c11-abi-test tests/c_abi_test.c)
     set_target_properties(le-c11-abi-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
@@ -113,6 +129,12 @@ if(LAE_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/mixed.txt)
         set_tests_properties(cli-variable-policy PROPERTIES
             PASS_REGULAR_EXPRESSION "\"strength\":0.600"
+        )
+        add_test(NAME cli-english-lexical-core
+            COMMAND le-cli --language en --model lexical-core --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt)
+        set_tests_properties(cli-english-lexical-core PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"lexical_salience\":1.000"
         )
     endif()
 endif()

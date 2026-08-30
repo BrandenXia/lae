@@ -15,7 +15,8 @@ _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, pres
                "v1 process options size changed");
 _Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
                "v2 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 6u), "unexpected ABI version");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 7u), "unexpected ABI version");
+_Static_assert(LE_PROVIDER_ABI_VERSION == (1u << 16u), "unexpected provider ABI version");
 
 static const uint8_t lexical_model_fixture[] = {
     0x4c, 0x41, 0x45, 0x4d, 0x4f, 0x44, 0x4c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
@@ -96,6 +97,21 @@ int main(void) {
     CHECK(model_config.struct_size == sizeof(model_config));
     CHECK(presentation.struct_size == sizeof(presentation));
     CHECK(le_runtime_create(&config, &runtime) == LE_OK);
+    CHECK(le_runtime_provider_count(NULL) == 0);
+    CHECK(le_runtime_provider_count(runtime) == 0);
+    CHECK(le_runtime_provider_name_at(runtime, 0).data == NULL);
+    CHECK(le_runtime_register_provider(runtime, NULL) == LE_ERROR_INVALID_ARGUMENT);
+    CHECK(le_runtime_load_provider(runtime, (le_string_view_t){NULL, 0}) ==
+          LE_ERROR_INVALID_ARGUMENT);
+    CHECK(le_runtime_dynamic_providers_enabled() == 0 ||
+          le_runtime_dynamic_providers_enabled() == 1);
+    if (!le_runtime_dynamic_providers_enabled()) {
+        CHECK(le_runtime_load_provider(runtime, (le_string_view_t){"provider", 8}) ==
+              LE_ERROR_UNSUPPORTED);
+    }
+    CHECK(strcmp(le_status_string(LE_ERROR_PLUGIN_INCOMPATIBLE), "LE_ERROR_PLUGIN_INCOMPATIBLE") ==
+          0);
+    CHECK(strcmp(le_status_string(LE_ERROR_UNSUPPORTED), "LE_ERROR_UNSUPPORTED") == 0);
     CHECK(le_model_load(runtime, NULL, 0, &invalid_model) == LE_ERROR_INVALID_ARGUMENT);
     CHECK(invalid_model == NULL);
     CHECK(le_model_load(runtime, lexical_model_fixture, sizeof(lexical_model_fixture), &model) ==

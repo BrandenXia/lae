@@ -19,6 +19,8 @@ typedef int32_t le_status_t;
 #define LE_ERROR_MODEL_INCOMPATIBLE ((le_status_t) - 6)
 #define LE_ERROR_PLUGIN_FAILURE ((le_status_t) - 7)
 #define LE_ERROR_INTERNAL ((le_status_t) - 8)
+#define LE_ERROR_PLUGIN_INCOMPATIBLE ((le_status_t) - 9)
+#define LE_ERROR_UNSUPPORTED ((le_status_t) - 10)
 
 /* A borrowed byte view. The data need not be null terminated. */
 typedef struct le_string_view {

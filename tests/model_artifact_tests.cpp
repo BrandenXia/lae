@@ -63,7 +63,7 @@ int main() {
           "artifact header and total sizes are encoded");
     check(read_u32(prefix_bytes, 20) == le::model::checksum(prefix_bytes),
           "artifact stores its CRC-32 checksum");
-    check(read_u32(prefix_bytes, 20) == 0x6535D9DBU,
+    check(read_u32(prefix_bytes, 20) == 0xAFE65754U,
           "prefix artifact matches the v1 golden checksum");
     const auto loaded_prefix = le::model::load(prefix_bytes);
     check(loaded_prefix.type == LE_MODEL_PREFIX && loaded_prefix.model_version == 7,

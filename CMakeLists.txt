@@ -1,9 +1,18 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.9.0 LANGUAGES C CXX)
+project(lae VERSION 0.10.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
+set(LAE_DYNAMIC_PROVIDERS_DEFAULT OFF)
+if(WIN32 OR UNIX OR APPLE)
+    set(LAE_DYNAMIC_PROVIDERS_DEFAULT ON)
+endif()
+if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|watchOS)$")
+    set(LAE_DYNAMIC_PROVIDERS_DEFAULT OFF)
+endif()
+option(LAE_ENABLE_DYNAMIC_PROVIDERS "Enable filesystem-backed provider modules"
+       ${LAE_DYNAMIC_PROVIDERS_DEFAULT})
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(UTF8PROC REQUIRED IMPORTED_TARGET libutf8proc)
@@ -17,6 +26,7 @@ add_library(le_runtime
     runtime/core/reading.cpp
     runtime/core/text.cpp
     runtime/model/artifact.cpp
+    runtime/plugin/provider_registry.cpp
     runtime/providers/chinese/chinese_provider.cpp
     runtime/providers/english/english_provider.cpp
     runtime/providers/generic/generic_provider.cpp
@@ -36,6 +46,10 @@ target_include_directories(le_runtime
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime
 )
 target_link_libraries(le_runtime PRIVATE PkgConfig::UTF8PROC)
+if(LAE_ENABLE_DYNAMIC_PROVIDERS)
+    target_compile_definitions(le_runtime PRIVATE LE_DYNAMIC_PROVIDER_LOADING=1)
+    target_link_libraries(le_runtime PRIVATE ${CMAKE_DL_LIBS})
+endif()
 set_target_properties(le_runtime PROPERTIES
     CXX_EXTENSIONS OFF
     CXX_VISIBILITY_PRESET hidden
@@ -142,6 +156,22 @@ if(LAE_BUILD_TESTS)
     target_compile_features(le-cpp-abi-test PRIVATE cxx_std_20)
     target_link_libraries(le-cpp-abi-test PRIVATE le::runtime)
     add_test(NAME cpp-abi COMMAND le-cpp-abi-test)
+
+    if(LAE_ENABLE_DYNAMIC_PROVIDERS)
+        add_library(le-test-provider MODULE tests/plugins/test_provider.c)
+        target_compile_features(le-test-provider PRIVATE c_std_11)
+        target_include_directories(le-test-provider PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        set_target_properties(le-test-provider PROPERTIES
+            C_VISIBILITY_PRESET hidden
+            PREFIX ""
+        )
+
+        add_executable(le-plugin-loader-tests tests/plugin_loader_tests.cpp)
+        target_compile_features(le-plugin-loader-tests PRIVATE cxx_std_20)
+        target_link_libraries(le-plugin-loader-tests PRIVATE le::runtime)
+        add_test(NAME plugin-dynamic
+            COMMAND le-plugin-loader-tests $<TARGET_FILE:le-test-provider>)
+    endif()
 
     add_test(NAME training-unit
         COMMAND ${CMAKE_COMMAND} -E env

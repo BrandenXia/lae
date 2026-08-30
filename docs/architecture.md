@@ -25,10 +25,12 @@ emphasis. Rendering is outside the library.
 
 ## Milestone implementation
 
-The language router selects statically linked providers for explicit `en` /
-`en-*` and `zh` / `zh-*` tags and otherwise selects the generic provider. The
-core owns the router and provider-neutral contract, but contains no English or
-Chinese analysis rules.
+The language router first queries external providers in deterministic
+registration order, then selects statically linked providers for explicit `en`
+/ `en-*` and `zh` / `zh-*` tags, and otherwise selects the generic provider.
+External providers use a stable C sink ABI; they never expose their allocator or
+C++ types to the core. The core owns the resulting storage and provider-neutral
+contract, but contains no English or Chinese analysis rules.
 
 The generic provider groups maximal runs of grapheme clusters separated by
 Unicode separator, control, or punctuation categories. This is only a fallback
@@ -93,13 +95,15 @@ candidate-minus-baseline deltas. No evaluation code is linked into the runtime.
 - Analyses, signals, and results remain valid after their runtime is destroyed.
 - Loaded models own parsed metadata and remain valid after runtime destruction.
 - Processing has no global mutable model or provider state and is deterministic.
+- Non-thread-safe plugin callbacks are serialized per registered provider;
+  providers may opt into concurrent callbacks explicitly.
 - Runtime targets do not import or link any source under `training/`.
 - Diagnostics are thread-local; each thread observes its own most recent error.
 - `utf8proc` supplies standards-based UTF-8 decoding and extended grapheme
   boundary behavior without introducing language-specific rules.
 
 The C ABI exposes immutable flat views of nodes, child identifiers, features,
-and language regions. Dynamic providers, a stable plugin ABI, mixed-language
-routing, and streaming remain deferred. English and Chinese now
-exercise structurally different uses of the same IR; Japanese remains a future
-third provider.
+and language regions. Provider ABI v1 supports static registration everywhere
+and optional module loading on supported hosts. Mixed-language routing and
+streaming remain deferred. English and Chinese exercise structurally different
+uses of the same IR; Japanese remains a future third built-in provider.

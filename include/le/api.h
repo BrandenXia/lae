@@ -4,6 +4,7 @@
 #include "le/analysis.h"
 #include "le/model.h"
 #include "le/presentation.h"
+#include "le/provider.h"
 #include "le/reading.h"
 #include "le/types.h"
 #include "le/version.h"
@@ -77,6 +78,19 @@ LE_API le_status_t le_runtime_create(const le_runtime_config_t* config, le_runti
 /* Destroy a runtime. NULL is accepted. Existing models, analyses, signals, and results remain
  * valid. */
 LE_API void le_runtime_destroy(le_runtime_t* runtime);
+
+/*
+ * Register a statically linked provider. On success the runtime owns the
+ * descriptor context lifecycle and calls destroy, when supplied, at teardown.
+ */
+LE_API le_status_t le_runtime_register_provider(le_runtime_t* runtime,
+                                                const le_provider_v1_t* provider);
+/* Load one provider module by filesystem path when dynamic loading is enabled. */
+LE_API le_status_t le_runtime_load_provider(le_runtime_t* runtime, le_string_view_t path);
+LE_API int le_runtime_dynamic_providers_enabled(void);
+/* Registered external providers are ordered before built-in providers. */
+LE_API size_t le_runtime_provider_count(const le_runtime_t* runtime);
+LE_API le_string_view_t le_runtime_provider_name_at(const le_runtime_t* runtime, size_t index);
 
 /* Load and validate an owned model handle from bytes borrowed for this call. */
 LE_API le_status_t le_model_load(le_runtime_t* runtime, const void* data, size_t size,

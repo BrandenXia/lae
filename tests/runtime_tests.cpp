@@ -1,12 +1,14 @@
 #include "le/api.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -18,12 +20,84 @@ struct Expected {
 };
 
 int failures = 0;
+int destroyed_provider_contexts = 0;
+
+struct StaticProviderContext {
+    std::atomic<int> active{0};
+    std::atomic<int> maximum_active{0};
+};
 
 void check(bool condition, std::string_view message) {
     if (!condition) {
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+int static_provider_supports(void*, le_string_view_t language) {
+    return language.size >= 2 && language.data[0] == 'x' && language.data[1] == 's';
+}
+
+int invalid_provider_supports(void*, le_string_view_t language) {
+    return language.size == 2 && language.data[0] == 'x' && language.data[1] == 'i';
+}
+
+le_status_t static_provider_analyze(void* context, le_string_view_t text, le_string_view_t language,
+                                    const le_analysis_sink_v1_t* sink) {
+    auto* state = static_cast<StaticProviderContext*>(context);
+    if (state != nullptr) {
+        const auto active = state->active.fetch_add(1) + 1;
+        auto maximum = state->maximum_active.load();
+        while (maximum < active && !state->maximum_active.compare_exchange_weak(maximum, active)) {
+        }
+        std::this_thread::yield();
+    }
+    const auto finish = [&] {
+        if (state != nullptr) {
+            state->active.fetch_sub(1);
+        }
+    };
+    if (sink == nullptr || sink->struct_size < LE_ANALYSIS_SINK_V1_SIZE || sink->flags != 0) {
+        finish();
+        return LE_ERROR_PLUGIN_FAILURE;
+    }
+    auto status = sink->add_node(sink->context, 0, LE_NODE_DOCUMENT,
+                                 le_text_span_t{0, static_cast<std::uint64_t>(text.size)});
+    if (status != LE_OK) {
+        finish();
+        return status;
+    }
+    status = sink->add_node(sink->context, 1, LE_NODE_UNIT,
+                            le_text_span_t{0, static_cast<std::uint64_t>(text.size)});
+    if (status != LE_OK) {
+        finish();
+        return status;
+    }
+    status = sink->add_child(sink->context, 0, 1);
+    if (status != LE_OK) {
+        finish();
+        return status;
+    }
+    status = sink->add_feature(sink->context, 1, LE_FEATURE_RANGE_VENDOR_BEGIN, 0.5F);
+    if (status != LE_OK) {
+        finish();
+        return status;
+    }
+    status = sink->add_language_region(
+        sink->context, le_text_span_t{0, static_cast<std::uint64_t>(text.size)}, language, 1.0F);
+    finish();
+    return status;
+}
+
+le_status_t invalid_provider_analyze(void*, le_string_view_t text, le_string_view_t,
+                                     const le_analysis_sink_v1_t* sink) {
+    return sink->add_node(sink->context, 0, LE_NODE_UNIT,
+                          le_text_span_t{0, static_cast<std::uint64_t>(text.size)});
+}
+
+void destroy_static_provider(void* context) {
+    delete static_cast<StaticProviderContext*>(context);
+    ++destroyed_provider_contexts;
 }
 
 std::vector<le_emphasis_t> run(std::string_view text, le_process_options_t* options = nullptr,
@@ -249,12 +323,98 @@ void lifetime_test() {
     le_result_destroy(result);
 }
 
+void static_provider_tests() {
+    le_runtime_t* runtime = nullptr;
+    check(le_runtime_create(nullptr, &runtime) == LE_OK, "plugin runtime creation");
+
+    le_provider_v1_t incompatible{};
+    incompatible.struct_size = LE_PROVIDER_V1_SIZE;
+    incompatible.abi_version = LE_PROVIDER_ABI_VERSION + 1;
+    incompatible.name = le_string_view_t{"future", 6};
+    incompatible.supports = static_provider_supports;
+    incompatible.analyze = static_provider_analyze;
+    check(le_runtime_register_provider(runtime, &incompatible) == LE_ERROR_PLUGIN_INCOMPATIBLE,
+          "future provider ABI is rejected");
+    check(le_runtime_provider_count(runtime) == 0, "rejected provider is not registered");
+
+    le_provider_v1_t provider{};
+    provider.struct_size = LE_PROVIDER_V1_SIZE;
+    provider.abi_version = LE_PROVIDER_ABI_VERSION;
+    provider.name = le_string_view_t{"test-static", 11};
+    auto* provider_context = new StaticProviderContext;
+    provider.context = provider_context;
+    provider.supports = static_provider_supports;
+    provider.analyze = static_provider_analyze;
+    provider.destroy = destroy_static_provider;
+    check(le_runtime_register_provider(runtime, &provider) == LE_OK,
+          "statically linked provider registers");
+    check(le_runtime_provider_count(runtime) == 1, "registered provider is discoverable");
+    const auto name = le_runtime_provider_name_at(runtime, 0);
+    check(std::string_view(name.data, name.size) == "test-static", "provider name is stable");
+
+    le_analysis_t* analysis = nullptr;
+    check(le_analyze(runtime, le_string_view_t{"static", 6}, le_string_view_t{"xs", 2},
+                     &analysis) == LE_OK,
+          "static provider handles supported language");
+    check(le_analysis_node_count(analysis) == 2, "static provider graph reaches public IR");
+    check(le_analysis_feature_count(analysis) == 1, "static provider feature reaches public IR");
+    check(le_analysis_feature_data(analysis)[0].id == LE_FEATURE_RANGE_VENDOR_BEGIN,
+          "static provider vendor feature is preserved");
+    le_analysis_destroy(analysis);
+
+    le_provider_v1_t invalid_provider{};
+    invalid_provider.struct_size = LE_PROVIDER_V1_SIZE;
+    invalid_provider.abi_version = LE_PROVIDER_ABI_VERSION;
+    invalid_provider.name = le_string_view_t{"test-invalid", 12};
+    invalid_provider.supports = invalid_provider_supports;
+    invalid_provider.analyze = invalid_provider_analyze;
+    check(le_runtime_register_provider(runtime, &invalid_provider) == LE_OK,
+          "provider output validation is deferred until analysis");
+    analysis = reinterpret_cast<le_analysis_t*>(0x1);
+    check(le_analyze(runtime, le_string_view_t{"invalid", 7}, le_string_view_t{"xi", 2},
+                     &analysis) == LE_ERROR_PLUGIN_FAILURE,
+          "invalid provider graph is rejected at the ABI boundary");
+    check(analysis == nullptr, "invalid provider graph produces no analysis handle");
+
+    le_process_options_t options;
+    le_process_options_init(&options);
+    options.language = le_string_view_t{"xs", 2};
+    le_result_t* result = nullptr;
+    check(le_process(runtime, le_string_view_t{"static", 6}, &options, &result) == LE_OK,
+          "static provider participates in high-level processing");
+    check(le_result_emphasis_count(result) == 1, "static provider feeds reading model");
+    le_result_destroy(result);
+
+    std::atomic<int> concurrent_failures{0};
+    std::vector<std::thread> workers;
+    for (int index = 0; index < 8; ++index) {
+        workers.emplace_back([&] {
+            le_analysis_t* concurrent_analysis = nullptr;
+            if (le_analyze(runtime, le_string_view_t{"parallel", 8}, le_string_view_t{"xs", 2},
+                           &concurrent_analysis) != LE_OK) {
+                ++concurrent_failures;
+            }
+            le_analysis_destroy(concurrent_analysis);
+        });
+    }
+    for (auto& worker : workers) {
+        worker.join();
+    }
+    check(concurrent_failures == 0, "concurrent provider analysis succeeds");
+    check(provider_context->maximum_active == 1,
+          "runtime serializes providers without the thread-safe flag");
+
+    le_runtime_destroy(runtime);
+    check(destroyed_provider_contexts == 1, "runtime releases registered provider context");
+}
+
 } // namespace
 
 int main() {
     unicode_golden_tests();
     contract_tests();
     lifetime_test();
+    static_provider_tests();
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";
         return EXIT_FAILURE;

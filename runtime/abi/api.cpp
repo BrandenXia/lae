@@ -3,6 +3,7 @@
 #include "core/pipeline.hpp"
 #include "core/text.hpp"
 #include "model/artifact.hpp"
+#include "plugin/provider_registry.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,6 +23,7 @@
 
 struct le_runtime {
     std::uint32_t abi_version = LE_ABI_VERSION;
+    le::plugin::ProviderRegistry providers;
 };
 
 struct le_result {
@@ -186,6 +188,14 @@ le::core::PresentationConfig presentation_defaults() {
 le::core::PipelineOptions defaults() {
     return le::core::PipelineOptions{"und", prefix_defaults(), presentation_defaults(),
                                      le::core::ReadingModelKind::prefix};
+}
+
+le::core::Analysis analyze_with_runtime(le_runtime& runtime, const le::core::Text& text,
+                                        std::string_view language) {
+    if (auto analysis = runtime.providers.analyze(text, language)) {
+        return std::move(*analysis);
+    }
+    return le::core::analyze(text, language);
 }
 
 bool model_supports_analysis_languages(const le::model::Artifact& model,
@@ -436,6 +446,74 @@ le_status_t le_runtime_create(const le_runtime_config_t* config, le_runtime_t** 
 
 void le_runtime_destroy(le_runtime_t* runtime) { delete runtime; }
 
+le_status_t le_runtime_register_provider(le_runtime_t* runtime, const le_provider_v1_t* provider) {
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (provider == nullptr) {
+        return invalid_argument("provider is null");
+    }
+    try {
+        runtime->providers.register_provider(*provider);
+        return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
+    } catch (const std::bad_alloc&) {
+        set_error("could not register provider");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while registering provider");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+le_status_t le_runtime_load_provider(le_runtime_t* runtime, le_string_view_t path) {
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (!valid_view(path)) {
+        return invalid_argument("provider path data is null while path size is nonzero");
+    }
+    try {
+        const auto module_path =
+            path.size == 0 ? std::string_view{} : std::string_view(path.data, path.size);
+        runtime->providers.load(module_path);
+        return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
+    } catch (const std::bad_alloc&) {
+        set_error("could not load provider");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while loading provider");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+int le_runtime_dynamic_providers_enabled(void) {
+    return le::plugin::dynamic_loading_enabled() ? 1 : 0;
+}
+
+size_t le_runtime_provider_count(const le_runtime_t* runtime) {
+    return runtime == nullptr ? 0 : runtime->providers.size();
+}
+
+le_string_view_t le_runtime_provider_name_at(const le_runtime_t* runtime, size_t index) {
+    if (runtime == nullptr) {
+        return le_string_view_t{nullptr, 0};
+    }
+    const auto name = runtime->providers.name_at(index);
+    return name.empty() ? le_string_view_t{nullptr, 0} : le_string_view_t{name.data(), name.size()};
+}
+
 le_status_t le_model_load(le_runtime_t* runtime, const void* data, size_t size,
                           le_model_t** out_model) {
     if (out_model == nullptr) {
@@ -537,10 +615,13 @@ le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text, le_string_v
         const std::string_view bytes =
             text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
         const le::core::Text core_text(bytes);
-        auto core_analysis = le::core::analyze(core_text, language_view(language));
+        auto core_analysis = analyze_with_runtime(*runtime, core_text, language_view(language));
         auto analysis = make_analysis(std::move(core_analysis), bytes);
         *out_analysis = analysis.release();
         return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
     } catch (const le::core::InvalidUtf8& error) {
         set_error(error.what());
         return LE_ERROR_INVALID_UTF8;
@@ -787,11 +868,21 @@ le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
         const std::string_view bytes =
             text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
         const le::core::Text core_text(bytes);
-        const auto core_emphasis = le::core::process(core_text, pipeline_options);
+        const auto analysis = analyze_with_runtime(*runtime, core_text, pipeline_options.language);
+        const auto signals =
+            pipeline_options.reading_model == le::core::ReadingModelKind::lexical_core
+                ? le::core::LexicalCoreReadingModel().generate(analysis)
+                : le::core::PrefixReadingModel(pipeline_options.prefix)
+                      .generate(core_text, analysis);
+        const auto core_emphasis =
+            le::core::generate_emphasis(signals, pipeline_options.presentation);
 
         auto result = make_result(core_emphasis);
         *out_result = result.release();
         return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
     } catch (const le::core::InvalidUtf8& error) {
         set_error(error.what());
         return LE_ERROR_INVALID_UTF8;
@@ -836,7 +927,7 @@ le_status_t le_process_with_model(le_runtime_t* runtime, const le_model_t* model
         const std::string_view bytes =
             text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
         const le::core::Text core_text(bytes);
-        const auto analysis = le::core::analyze(core_text, pipeline_options.language);
+        const auto analysis = analyze_with_runtime(*runtime, core_text, pipeline_options.language);
         if (!model_supports_analysis_languages(model->core, analysis)) {
             set_error("model does not support the requested language");
             return LE_ERROR_UNSUPPORTED_LANGUAGE;
@@ -846,6 +937,9 @@ le_status_t le_process_with_model(le_runtime_t* runtime, const le_model_t* model
             make_result(le::core::generate_emphasis(signals, pipeline_options.presentation));
         *out_result = result.release();
         return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
     } catch (const le::model::ArtifactError& error) {
         set_error(error.what());
         return LE_ERROR_MODEL_INCOMPATIBLE;
@@ -891,6 +985,10 @@ const char* le_status_string(le_status_t status) {
         return "LE_ERROR_PLUGIN_FAILURE";
     case LE_ERROR_INTERNAL:
         return "LE_ERROR_INTERNAL";
+    case LE_ERROR_PLUGIN_INCOMPATIBLE:
+        return "LE_ERROR_PLUGIN_INCOMPATIBLE";
+    case LE_ERROR_UNSUPPORTED:
+        return "LE_ERROR_UNSUPPORTED";
     default:
         return "LE_ERROR_UNKNOWN";
     }

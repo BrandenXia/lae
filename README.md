@@ -3,7 +3,8 @@
 LAE is an early language-aware typographic emphasis runtime. The current
 milestone provides a stable C ABI, a validated and inspectable linguistic IR,
 a generic Unicode fallback, statically linked rule-based English and Chinese
-providers, prefix and lexical-core reading models, and binary or
+providers, a stable C provider plugin ABI, prefix and lexical-core reading
+models, and binary or
 variable-strength presentation. Versioned `.lem` artifacts can now carry model
 parameters and capability metadata into the memory-based runtime loader. An
 independent standard-library Python package can validate offline datasets,
@@ -11,9 +12,10 @@ extract features, optimize a deterministic prefix baseline, evaluate it, and
 export the same artifact format. Its strategy-neutral evaluation layer compares
 offline plan density/complexity and paired human-study outcomes. LAE still
 intentionally has no renderer, runtime training dependency, automatic language
-detection, neural network, or dynamic plugin system. A first learned linear
-salience model now consumes stable IR features through the same artifact and C
-processing APIs as deterministic models.
+detection, or neural network. A first learned linear salience model consumes
+stable IR features through the same artifact and C processing APIs as
+deterministic models. External providers can be registered statically on every
+target or loaded from modules when the optional desktop capability is enabled.
 
 ## Build and test
 
@@ -26,6 +28,13 @@ not require Python.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ctest --test-dir build --output-on-failure
+```
+
+For static/mobile/WASM builds without operating-system module loading:
+
+```sh
+cmake -S . -B build-static -DBUILD_SHARED_LIBS=OFF \
+  -DLAE_ENABLE_DYNAMIC_PROVIDERS=OFF
 ```
 
 Try the C-ABI-only CLI:
@@ -62,7 +71,7 @@ nodes, features, and language regions as JSON.
 ## Current architecture
 
 ```text
-UTF-8 → language router → generic, English, or Chinese provider → linguistic IR
+UTF-8 → external or built-in language provider → validated linguistic IR
       → built-in or artifact-loaded reading model → reading signals
       → binary/variable presentation policy → emphasis spans
 ```
@@ -75,6 +84,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [training/runtime boundary](docs/training-runtime-boundary.md),
 [evaluation framework](docs/evaluation.md),
 [learned model](docs/learned-model.md),
+[provider plugin ABI](docs/provider-plugin-abi.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and

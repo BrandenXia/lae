@@ -17,6 +17,8 @@ ABI 1.5 adds the opaque model lifecycle, metadata discovery,
 artifact-driven signal generation, and high-level model processing functions.
 ABI 1.6 adds the `LE_MODEL_LINEAR_SALIENCE` model type without changing any
 function signature or public structure layout.
+ABI 1.7 adds provider ABI v1, runtime-local provider discovery and registration,
+and optional dynamic module loading.
 
 ## Function contracts
 
@@ -28,6 +30,10 @@ function signature or public structure layout.
 | `le_presentation_config_init` | `config` may be null; otherwise caller-owned | Safe for distinct objects | No failure |
 | `le_runtime_create` | `config` may be null; `out_runtime` must not be null; caller owns success result | Safe | Returns status; writes null before failure |
 | `le_runtime_destroy` | Null accepted; consumes the handle | Safe for an unshared handle | Existing models, analyses, signals, and results remain valid |
+| `le_runtime_register_provider` | Runtime and v1 descriptor required; runtime takes context lifecycle on success | Safe; briefly blocks concurrent routing | Validates compatibility and unique name |
+| `le_runtime_load_provider` | Runtime and path required; path borrowed for call | Safe; briefly blocks concurrent routing | Optional build capability; module retained by runtime |
+| `le_runtime_provider_*` | Runtime borrowed; null/out-of-range returns empty | Safe | Names remain borrowed until runtime destruction |
+| `le_runtime_dynamic_providers_enabled` | No arguments | Safe | Returns a build capability, not module availability |
 | `le_model_load` | Runtime, bytes, and output required; bytes borrowed during call; caller owns model | Concurrent calls are safe | Fully validates artifact; writes null before failure |
 | `le_model_destroy` | Null accepted; consumes model | Safe for an unshared handle | No failure |
 | `le_model_*` metadata accessors | Null returns zero/empty; model borrowed | Safe | Views last until model destruction |
@@ -48,9 +54,10 @@ function signature or public structure layout.
 | `le_result_emphasis_data` | Null/empty returns null; array is borrowed | Safe | Array lasts until result destruction |
 | `le_result_destroy` | Null accepted; consumes result and all nested storage | Safe for an unshared handle | No failure |
 
-Destroying or using the same handle concurrently is not supported. A caller may
-process concurrently through one runtime because the current runtime and its
-provider/model objects have no mutable processing state.
+Destroying a runtime concurrently with another operation is not supported. A
+caller may process concurrently through one runtime. External callbacks are
+concurrent only when their descriptor declares `LE_PROVIDER_FLAG_THREAD_SAFE`;
+the runtime serializes other provider contexts.
 
 ## Model lifecycle and metadata
 
@@ -85,11 +92,13 @@ defaults. On 64-bit targets, an explicit reserved field occupies v2's historical
 tail padding so the v2 and v3 size boundaries remain distinguishable.
 
 `language` is a non-null-terminated borrowed BCP-47-compatible byte view. The
-router selects English for `en` / `en-*` and Chinese for `zh` / `zh-*`; the
-generic fallback records all other tags as region metadata but does not
-interpret them. Empty language means `und`. This preserves explicit routing
-information without putting language behavior in the core. There is no
-automatic or mixed-language detection in this version.
+router queries registered external providers first, then selects English for
+`en` / `en-*` and Chinese for `zh` / `zh-*`; the generic fallback records all
+other tags as region metadata but does not interpret them. Empty language means
+`und`. This preserves explicit routing information without putting language
+behavior in the core. There is no automatic or mixed-language detection in this
+version. The complete provider contract is documented in the
+[provider plugin ABI](provider-plugin-abi.md).
 
 ## Analysis representation
 
@@ -147,8 +156,10 @@ flags, strategies, or normalized values return `LE_ERROR_INVALID_ARGUMENT`.
 Malformed artifacts return `LE_ERROR_MODEL_INVALID`; valid artifacts requiring
 unsupported ABI, format, features, flags, or model types return
 `LE_ERROR_MODEL_INCOMPATIBLE`. Language capability mismatches return
-`LE_ERROR_UNSUPPORTED_LANGUAGE`. Allocation failures return
-`LE_ERROR_OUT_OF_MEMORY`. Use
+`LE_ERROR_UNSUPPORTED_LANGUAGE`. Provider descriptor mismatches return
+`LE_ERROR_PLUGIN_INCOMPATIBLE`; callback, module, and emitted-IR failures return
+`LE_ERROR_PLUGIN_FAILURE`. A capability compiled out of the runtime returns
+`LE_ERROR_UNSUPPORTED`. Allocation failures return `LE_ERROR_OUT_OF_MEMORY`. Use
 `le_runtime_last_error` for a thread-local diagnostic intended for humans. The
 diagnostic uses fixed thread-local storage so reporting an allocation failure
 cannot itself allocate; messages longer than 511 bytes are truncated.

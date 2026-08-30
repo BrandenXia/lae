@@ -109,17 +109,17 @@ class ArtifactTests(unittest.TestCase):
             model_version=7,
         )
         expected = bytes.fromhex(
-            "4c41454d4f444c00010000004000000054000000dbd935650600010001000000"
+            "4c41454d4f444c000100000040000000540000005457e6af0700010001000000"
             "0700000002000000000000004000000048000000480000000300000000000000"
             "0200656e02007a6802000000020000000000003f"
         )
         self.assertEqual(artifact, expected)
         self.assertEqual(len(artifact), 84)
         self.assertEqual(artifact[:8], b"LAEMODL\0")
-        self.assertEqual(struct.unpack_from("<I", artifact, 20)[0], 0x6535D9DB)
+        self.assertEqual(struct.unpack_from("<I", artifact, 20)[0], 0xAFE65754)
         checksum_input = bytearray(artifact)
         struct.pack_into("<I", checksum_input, 20, 0)
-        self.assertEqual(zlib.crc32(checksum_input) & 0xFFFFFFFF, 0x6535D9DB)
+        self.assertEqual(zlib.crc32(checksum_input) & 0xFFFFFFFF, 0xAFE65754)
         self.assertEqual(struct.unpack_from("<I", artifact, 24)[0], ABI_VERSION)
 
     def test_lexical_core_encoder_declares_required_feature(self) -> None:

@@ -3,7 +3,7 @@
 Language providers answer “what structure and features exist in this text?”
 They must not emit bold spans, font weights, HTML, or presentation styles.
 
-The internal `LanguageProvider` contract accepts validated immutable text plus
+The built-in `LanguageProvider` contract accepts validated immutable text plus
 advisory language metadata. Providers declare whether they support a language
 tag and return a core-owned `Analysis`. The internal router currently chooses
 English for `en` / `en-*`, Chinese for `zh` / `zh-*`, then falls back to generic
@@ -26,8 +26,10 @@ token and affix rules there, while Chinese keeps Han ranges, segmentation, and
 its compact lexicon there. External NLP libraries must likewise be wrapped
 inside concrete providers; the runtime core may not depend on them.
 
-English and Chinese now exercise different structures through this contract. A
-sink-based plugin ABI and dynamic loading remain deliberately postponed until
-the later plugin milestone. At that point, the core should validate sink events
-and own the resulting graph and storage. Static provider registration must
-remain possible for iOS, WASM, and embedded builds.
+English and Chinese exercise different structures through this contract. The
+public provider ABI v1 now exposes an equivalent C-only, sink-based boundary.
+The runtime owns sink storage and validates the completed graph before it
+reaches a model. Providers can be registered statically on every target or
+loaded from modules when that optional build capability is enabled. See the
+[provider plugin ABI](provider-plugin-abi.md) for callbacks, ownership, and
+compatibility rules.

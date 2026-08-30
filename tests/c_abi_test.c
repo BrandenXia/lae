@@ -8,13 +8,14 @@ _Static_assert(sizeof(le_status_t) == sizeof(int32_t), "le_status_t must be int3
 _Static_assert(offsetof(le_text_span_t, begin) == 0, "span begin must be first");
 _Static_assert(sizeof(le_feature_t) == 8, "feature ABI layout changed");
 _Static_assert(sizeof(le_model_type_t) == sizeof(uint32_t), "model type must be uint32_t-sized");
+_Static_assert(LE_MODEL_LINEAR_SALIENCE == 3u, "unexpected learned model type");
 _Static_assert(sizeof(le_reading_signal_t) == 32, "reading signal ABI layout changed");
 _Static_assert(offsetof(le_analysis_node_t, span) == 8, "analysis node ABI layout changed");
 _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, presentation_policy),
                "v1 process options size changed");
 _Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
                "v2 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 5u), "unexpected ABI version");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 6u), "unexpected ABI version");
 
 static const uint8_t lexical_model_fixture[] = {
     0x4c, 0x41, 0x45, 0x4d, 0x4f, 0x44, 0x4c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,

@@ -66,6 +66,12 @@ dependency. Loaded prefix artifacts supply strategy parameters; lexical-core
 artifacts declare their required feature ID. Both feed the same reading-signal
 and presentation stages as the compatibility APIs.
 
+Linear-salience artifacts add a bias and sparse weights keyed by stable IR
+feature IDs. The model scores `unit` nodes, treats missing features as zero,
+clamps predictions to normalized salience, and feeds the existing presentation
+stage. Training owns regression and export; runtime code only validates and
+evaluates compiled parameters.
+
 The independent `training/` Python package consumes versioned JSON Lines data.
 Preprocessing records provider-neutral unit spans, grapheme boundaries, and
 target prefix counts as UTF-8 byte coordinates. Feature extraction and a small

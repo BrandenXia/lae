@@ -11,7 +11,9 @@ extract features, optimize a deterministic prefix baseline, evaluate it, and
 export the same artifact format. Its strategy-neutral evaluation layer compares
 offline plan density/complexity and paired human-study outcomes. LAE still
 intentionally has no renderer, runtime training dependency, automatic language
-detection, neural model, or dynamic plugin system.
+detection, neural network, or dynamic plugin system. A first learned linear
+salience model now consumes stable IR features through the same artifact and C
+processing APIs as deterministic models.
 
 ## Build and test
 
@@ -47,6 +49,11 @@ PYTHONPATH=training/src python3 -m lae_training \
   summarize-plans training/tests/fixtures/plans.jsonl --baseline plain
 PYTHONPATH=training/src python3 -m lae_training \
   summarize-study training/tests/fixtures/study.jsonl --baseline plain
+PYTHONPATH=training/src python3 -m lae_training fit-linear-salience \
+  training/tests/fixtures/salience-training.jsonl build/learned.lem --ridge 0
+build/le-model inspect build/learned.lem
+printf 'unbelievable reading' | build/le-cli \
+  --artifact build/learned.lem --language en --dump-signals
 ```
 
 The CLI prints ordered, non-overlapping UTF-8 byte ranges or the provider's
@@ -67,6 +74,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [model artifact format](docs/model-format.md),
 [training/runtime boundary](docs/training-runtime-boundary.md),
 [evaluation framework](docs/evaluation.md),
+[learned model](docs/learned-model.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and

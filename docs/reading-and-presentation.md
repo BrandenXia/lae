@@ -22,6 +22,11 @@ lexical salience set to `1.0`. It does not require one structural level: English
 marks morphological subunits and Chinese marks segmented units. The model is
 language-independent, and the generic fallback produces no lexical-core facts.
 
+The learned linear-salience model scores each `unit` from stable IR feature IDs.
+It emits the clamped prediction in both fixation and lexical channels and skips
+zero predictions. It does not inspect language-specific feature meanings;
+language metadata on the artifact limits where fitted weights may run.
+
 The same two models can be loaded from `.lem` artifacts. Prefix artifacts move
 strategy, fixed-count, and proportion parameters out of the runtime call site.
 Lexical-core artifacts declare `LE_FEATURE_LEXICAL_CORE` as a required runtime

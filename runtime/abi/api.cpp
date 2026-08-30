@@ -211,6 +211,30 @@ std::vector<le::core::ReadingSignal> generate_model_signals(const le::core::Text
     if (model.type == LE_MODEL_LEXICAL_CORE) {
         return le::core::LexicalCoreReadingModel().generate(analysis);
     }
+    if (model.type == LE_MODEL_LINEAR_SALIENCE) {
+        std::vector<le::core::ReadingSignal> signals;
+        for (const auto& node : analysis.nodes) {
+            if (node.kind != le::core::NodeKind::unit) {
+                continue;
+            }
+            auto salience = static_cast<double>(model.linear_bias);
+            for (const auto& learned_weight : model.linear_weights) {
+                const auto feature =
+                    std::ranges::find_if(node.features, [&](const le::core::Feature& item) {
+                        return item.id == learned_weight.feature;
+                    });
+                if (feature != node.features.end()) {
+                    salience += static_cast<double>(learned_weight.weight) *
+                                static_cast<double>(feature->value);
+                }
+            }
+            const auto normalized = static_cast<float>(std::clamp(salience, 0.0, 1.0));
+            if (normalized > 0.0F) {
+                signals.push_back(le::core::ReadingSignal{node.span, normalized, normalized, 0.0F});
+            }
+        }
+        return signals;
+    }
     throw le::model::ArtifactError(le::model::ErrorKind::incompatible,
                                    "loaded model type is no longer supported");
 }

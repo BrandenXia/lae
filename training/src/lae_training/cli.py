@@ -8,14 +8,20 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from .artifacts import build_prefix_artifact, write_artifact
+from .artifacts import (
+    build_linear_salience_artifact,
+    build_prefix_artifact,
+    write_artifact,
+)
 from .dataset import DatasetError, JsonlDataset
 from .evaluation import PrefixCandidate, evaluate_prefix
 from .evaluation_records import EvaluationDataError
 from .features import extract_features
+from .linear_salience import fit_linear_salience
 from .optimize import fit_prefix
 from .plan_evaluation import PlanJsonlDataset, aggregate_plans, compare_plans
 from .study_evaluation import StudyJsonlDataset, aggregate_study, compare_study
+from .salience_dataset import SalienceJsonlDataset
 
 
 def _dataset(path: str) -> tuple:
@@ -78,6 +84,36 @@ def _fit(arguments: argparse.Namespace) -> None:
     print(json.dumps(report, sort_keys=True))
 
 
+def _fit_linear_salience(arguments: argparse.Namespace) -> None:
+    examples = tuple(SalienceJsonlDataset(arguments.dataset))
+    fitted = fit_linear_salience(examples, arguments.feature, arguments.ridge)
+    languages = (
+        tuple(arguments.language)
+        if arguments.language
+        else tuple(sorted({example.language for example in examples}, key=str.lower))
+    )
+    artifact = build_linear_salience_artifact(
+        fitted.bias,
+        fitted.weights,
+        languages=languages,
+        model_version=arguments.model_version,
+    )
+    write_artifact(arguments.output, artifact)
+    report = {
+        "artifact": str(arguments.output),
+        "artifact_size": len(artifact),
+        "bias": fitted.bias,
+        "languages": languages,
+        "metrics": fitted.metrics.as_dict(),
+        "ridge": fitted.ridge,
+        "weights": [
+            {"feature": feature_id, "weight": weight}
+            for feature_id, weight in fitted.weights
+        ],
+    }
+    print(json.dumps(report, sort_keys=True))
+
+
 def _summarize_plans(arguments: argparse.Namespace) -> None:
     records = tuple(PlanJsonlDataset(arguments.plans))
     report = {
@@ -123,6 +159,17 @@ def parser() -> argparse.ArgumentParser:
     fit.add_argument("--language", action="append")
     fit.add_argument("--model-version", type=int, default=1)
     fit.set_defaults(handler=_fit)
+
+    learned = commands.add_parser(
+        "fit-linear-salience", help="fit and export a linear unit-salience model"
+    )
+    learned.add_argument("dataset")
+    learned.add_argument("output")
+    learned.add_argument("--feature", type=int, action="append")
+    learned.add_argument("--ridge", type=float, default=1e-6)
+    learned.add_argument("--language", action="append")
+    learned.add_argument("--model-version", type=int, default=1)
+    learned.set_defaults(handler=_fit_linear_salience)
 
     plans = commands.add_parser(
         "summarize-plans", help="aggregate strategy-neutral offline plan metrics"

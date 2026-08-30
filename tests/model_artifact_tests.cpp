@@ -54,7 +54,7 @@ void expect_error(const std::vector<std::uint8_t>& bytes, le::model::ErrorKind k
 
 int main() {
     const le::model::Artifact prefix{
-        LE_ABI_VERSION, LE_MODEL_PREFIX, 7, {"en", "zh"}, {}, LE_PREFIX_FIXED, 2, 0.5F};
+        LE_ABI_VERSION, LE_MODEL_PREFIX, 7, {"en", "zh"}, {}, LE_PREFIX_FIXED, 2, 0.5F, 0.0F, {}};
     const auto prefix_bytes = le::model::encode(prefix);
     check(prefix_bytes.size() == 84, "prefix fixture has stable encoded size");
     check(std::string_view(reinterpret_cast<const char*>(prefix_bytes.data()), 7) == "LAEMODL",
@@ -63,7 +63,7 @@ int main() {
           "artifact header and total sizes are encoded");
     check(read_u32(prefix_bytes, 20) == le::model::checksum(prefix_bytes),
           "artifact stores its CRC-32 checksum");
-    check(read_u32(prefix_bytes, 20) == 0xE1304C0BU,
+    check(read_u32(prefix_bytes, 20) == 0x6535D9DBU,
           "prefix artifact matches the v1 golden checksum");
     const auto loaded_prefix = le::model::load(prefix_bytes);
     check(loaded_prefix.type == LE_MODEL_PREFIX && loaded_prefix.model_version == 7,
@@ -88,12 +88,37 @@ int main() {
         LE_PREFIX_PROPORTIONAL,
         1,
         0.5F,
+        0.0F,
+        {},
     };
     const auto lexical_bytes = le::model::encode(lexical);
     check(lexical_bytes.size() == 76, "lexical fixture has stable encoded size");
     const auto loaded_lexical = le::model::load(lexical_bytes);
     check(loaded_lexical.required_features == std::vector<std::uint32_t>{LE_FEATURE_LEXICAL_CORE},
           "required feature metadata round trips");
+
+    const le::model::Artifact linear{
+        LE_ABI_VERSION,
+        LE_MODEL_LINEAR_SALIENCE,
+        9,
+        {"en"},
+        {LE_FEATURE_GRAPHEME_COUNT, LE_FEATURE_SCRIPT_LATIN},
+        LE_PREFIX_PROPORTIONAL,
+        1,
+        0.5F,
+        0.1F,
+        {{LE_FEATURE_GRAPHEME_COUNT, 0.2F}, {LE_FEATURE_SCRIPT_LATIN, 0.3F}},
+    };
+    const auto linear_bytes = le::model::encode(linear);
+    check(linear_bytes.size() == 100, "linear salience fixture has stable encoded size");
+    const auto loaded_linear = le::model::load(linear_bytes);
+    check(loaded_linear.type == LE_MODEL_LINEAR_SALIENCE &&
+              loaded_linear.linear_weights.size() == 2,
+          "linear salience type and weights round trip");
+    check(loaded_linear.linear_bias == 0.1F &&
+              loaded_linear.linear_weights[1].feature == LE_FEATURE_SCRIPT_LATIN &&
+              loaded_linear.linear_weights[1].weight == 0.3F,
+          "linear salience parameters round trip");
 
     auto corrupted = prefix_bytes;
     corrupted.back() ^= 0x01U;
@@ -128,6 +153,20 @@ int main() {
     expect_error(bad_offset, le::model::ErrorKind::invalid,
                  "inconsistent table offset is rejected");
 
+    auto duplicate_linear_weight = linear_bytes;
+    const auto linear_parameters = read_u32(duplicate_linear_weight, 52);
+    set_u32(duplicate_linear_weight, linear_parameters + 16,
+            read_u32(duplicate_linear_weight, linear_parameters + 8));
+    reseal(duplicate_linear_weight);
+    expect_error(duplicate_linear_weight, le::model::ErrorKind::invalid,
+                 "duplicate encoded linear weight is rejected");
+
+    auto non_finite_linear_bias = linear_bytes;
+    set_u32(non_finite_linear_bias, linear_parameters, 0x7FC00000U);
+    reseal(non_finite_linear_bias);
+    expect_error(non_finite_linear_bias, le::model::ErrorKind::invalid,
+                 "non-finite encoded linear bias is rejected");
+
     try {
         auto duplicate_language = prefix;
         duplicate_language.languages.push_back("EN");
@@ -136,6 +175,35 @@ int main() {
     } catch (const le::model::ArtifactError& error) {
         check(error.kind() == le::model::ErrorKind::invalid,
               "duplicate language metadata is rejected");
+    }
+
+    try {
+        auto missing_required_feature = linear;
+        missing_required_feature.required_features.pop_back();
+        static_cast<void>(le::model::encode(missing_required_feature));
+        check(false, "linear weight without required feature is rejected");
+    } catch (const le::model::ArtifactError& error) {
+        check(error.kind() == le::model::ErrorKind::invalid,
+              "linear weight without required feature is rejected");
+    }
+
+    try {
+        auto duplicate_weight = linear;
+        duplicate_weight.linear_weights.push_back(duplicate_weight.linear_weights.front());
+        static_cast<void>(le::model::encode(duplicate_weight));
+        check(false, "duplicate linear weight is rejected");
+    } catch (const le::model::ArtifactError& error) {
+        check(error.kind() == le::model::ErrorKind::invalid, "duplicate linear weight is rejected");
+    }
+
+    try {
+        auto stale_linear_abi = linear;
+        stale_linear_abi.minimum_abi_version = (1U << 16U) | 5U;
+        static_cast<void>(le::model::encode(stale_linear_abi));
+        check(false, "linear model cannot claim a pre-1.6 ABI");
+    } catch (const le::model::ArtifactError& error) {
+        check(error.kind() == le::model::ErrorKind::invalid,
+              "linear model cannot claim a pre-1.6 ABI");
     }
 
     if (failures != 0) {

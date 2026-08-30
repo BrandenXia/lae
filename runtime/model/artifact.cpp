@@ -114,6 +114,18 @@ bool known_feature(std::uint32_t feature) {
     return std::ranges::find(known, feature) != known.end();
 }
 
+std::uint32_t float_bits(float value) {
+    std::uint32_t bits = 0;
+    std::memcpy(&bits, &value, sizeof(float));
+    return bits;
+}
+
+float bits_float(std::uint32_t bits) {
+    float value = 0.0F;
+    std::memcpy(&value, &bits, sizeof(float));
+    return value;
+}
+
 void validate_metadata(const Artifact& artifact) {
     if (artifact.minimum_abi_version > LE_ABI_VERSION ||
         (artifact.minimum_abi_version >> 16U) != LE_ABI_VERSION_MAJOR) {
@@ -160,6 +172,36 @@ void validate_metadata(const Artifact& artifact) {
         if (std::ranges::find(artifact.required_features, std::uint32_t(LE_FEATURE_LEXICAL_CORE)) ==
             artifact.required_features.end()) {
             fail(ErrorKind::invalid, "lexical-core model does not declare its required feature");
+        }
+    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE) {
+        constexpr auto minimum_linear_abi = (1U << 16U) | 6U;
+        if (artifact.minimum_abi_version < minimum_linear_abi) {
+            fail(ErrorKind::invalid, "linear salience model minimum ABI predates model support");
+        }
+        if (!std::isfinite(artifact.linear_bias)) {
+            fail(ErrorKind::invalid, "linear salience model bias is not finite");
+        }
+        if (artifact.linear_weights.empty() || artifact.linear_weights.size() > 256) {
+            fail(ErrorKind::invalid, "linear salience model weight count is invalid");
+        }
+        std::vector<std::uint32_t> weighted_features;
+        for (const auto& item : artifact.linear_weights) {
+            if (!known_feature(item.feature)) {
+                fail(ErrorKind::incompatible,
+                     "linear salience model uses an unsupported feature identifier");
+            }
+            if (!std::isfinite(item.weight)) {
+                fail(ErrorKind::invalid, "linear salience model contains a non-finite weight");
+            }
+            if (std::ranges::find(weighted_features, item.feature) != weighted_features.end()) {
+                fail(ErrorKind::invalid, "linear salience model contains a duplicate weight");
+            }
+            if (std::ranges::find(artifact.required_features, item.feature) ==
+                artifact.required_features.end()) {
+                fail(ErrorKind::invalid,
+                     "linear salience model weight is absent from required features");
+            }
+            weighted_features.push_back(item.feature);
         }
     } else {
         fail(ErrorKind::incompatible, "model type is not supported by this runtime");
@@ -221,7 +263,9 @@ Artifact load(std::span<const std::uint8_t> bytes) {
                       {},
                       LE_PREFIX_PROPORTIONAL,
                       1,
-                      0.5F};
+                      0.5F,
+                      0.0F,
+                      {}};
     std::size_t cursor = languages_offset;
     artifact.languages.reserve(language_count);
     for (std::uint32_t index = 0; index < language_count; ++index) {
@@ -252,10 +296,25 @@ Artifact load(std::span<const std::uint8_t> bytes) {
         }
         artifact.prefix_strategy = read_u32(bytes, cursor);
         artifact.fixed_graphemes = read_u32(bytes, cursor + 4);
-        const auto proportion_bits = read_u32(bytes, cursor + 8);
-        std::memcpy(&artifact.prefix_proportion, &proportion_bits, sizeof(float));
+        artifact.prefix_proportion = bits_float(read_u32(bytes, cursor + 8));
     } else if (artifact.type == LE_MODEL_LEXICAL_CORE && parameter_count != 0) {
         fail(ErrorKind::invalid, "lexical-core model must not contain parameters");
+    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE) {
+        if (parameter_count < 4 || parameter_count % 2 != 0) {
+            fail(ErrorKind::invalid, "linear salience model parameter count is invalid");
+        }
+        artifact.linear_bias = bits_float(read_u32(bytes, cursor));
+        const auto weight_count = read_u32(bytes, cursor + 4);
+        if (weight_count == 0 || weight_count > 256 || parameter_count != 2 + 2 * weight_count) {
+            fail(ErrorKind::invalid, "linear salience model weight table is invalid");
+        }
+        artifact.linear_weights.reserve(weight_count);
+        cursor += 8;
+        for (std::uint32_t index = 0; index < weight_count; ++index) {
+            artifact.linear_weights.push_back(Artifact::FeatureWeight{
+                read_u32(bytes, cursor), bits_float(read_u32(bytes, cursor + 4))});
+            cursor += 8;
+        }
     }
     validate_metadata(artifact);
     return artifact;
@@ -263,6 +322,11 @@ Artifact load(std::span<const std::uint8_t> bytes) {
 
 std::vector<std::uint8_t> encode(const Artifact& artifact) {
     validate_metadata(artifact);
+    const auto parameter_count =
+        artifact.type == LE_MODEL_PREFIX ? 3U
+        : artifact.type == LE_MODEL_LINEAR_SALIENCE
+            ? static_cast<std::uint32_t>(2 + 2 * artifact.linear_weights.size())
+            : 0U;
     std::vector<std::uint8_t> bytes(magic.begin(), magic.end());
     write_u16(bytes, LE_MODEL_FORMAT_VERSION_MAJOR);
     write_u16(bytes, LE_MODEL_FORMAT_VERSION_MINOR);
@@ -279,7 +343,7 @@ std::vector<std::uint8_t> encode(const Artifact& artifact) {
     write_u32(bytes, 0);
     const auto parameters_offset_index = bytes.size();
     write_u32(bytes, 0);
-    write_u32(bytes, artifact.type == LE_MODEL_PREFIX ? 3 : 0);
+    write_u32(bytes, parameter_count);
     write_u32(bytes, 0);
 
     for (const auto& language : artifact.languages) {
@@ -294,9 +358,14 @@ std::vector<std::uint8_t> encode(const Artifact& artifact) {
     if (artifact.type == LE_MODEL_PREFIX) {
         write_u32(bytes, artifact.prefix_strategy);
         write_u32(bytes, artifact.fixed_graphemes);
-        std::uint32_t proportion_bits = 0;
-        std::memcpy(&proportion_bits, &artifact.prefix_proportion, sizeof(float));
-        write_u32(bytes, proportion_bits);
+        write_u32(bytes, float_bits(artifact.prefix_proportion));
+    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE) {
+        write_u32(bytes, float_bits(artifact.linear_bias));
+        write_u32(bytes, static_cast<std::uint32_t>(artifact.linear_weights.size()));
+        for (const auto& item : artifact.linear_weights) {
+            write_u32(bytes, item.feature);
+            write_u32(bytes, float_bits(item.weight));
+        }
     }
     if (bytes.size() > maximum_artifact_size ||
         bytes.size() > std::numeric_limits<std::uint32_t>::max()) {

@@ -2,7 +2,7 @@
 
 LAE evaluates emphasis strategies outside the runtime. The framework accepts
 arbitrary variant names, so the same machinery can compare plain text,
-traditional prefixes, morphological emphasis, and future learned models.
+traditional prefixes, morphological emphasis, and learned models.
 It has two versioned JSON Lines inputs: offline emphasis plans and human-study
 observations.
 

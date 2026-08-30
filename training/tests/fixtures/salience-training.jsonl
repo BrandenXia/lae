@@ -1,0 +1,2 @@
+{"schema_version":1,"id":"salience-1","language":"en","units":[{"features":[{"id":2,"value":1}],"target_salience":0.2},{"features":[{"id":2,"value":2}],"target_salience":0.4}]}
+{"schema_version":1,"id":"salience-2","language":"en","units":[{"features":[{"id":2,"value":3}],"target_salience":0.6},{"features":[{"id":2,"value":4}],"target_salience":0.8}]}

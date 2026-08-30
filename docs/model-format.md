@@ -23,7 +23,7 @@ Format v1 uses this fixed 64-byte header:
 | 16 | 4 | total size | exact input-buffer size |
 | 20 | 4 | checksum | CRC-32/ISO-HDLC over the entire artifact with these four bytes treated as zero |
 | 24 | 4 | minimum ABI | packed `(major << 16) | minor` |
-| 28 | 4 | model type | `1` prefix, `2` lexical core |
+| 28 | 4 | model type | `1` prefix, `2` lexical core, `3` linear salience |
 | 32 | 4 | model version | nonzero producer-defined version |
 | 36 | 4 | language count | at most 64 |
 | 40 | 4 | required-feature count | at most 256 |
@@ -59,6 +59,18 @@ Prefix models contain exactly three 32-bit words:
 Lexical-core models contain no parameter words and must declare
 `LE_FEATURE_LEXICAL_CORE` as a required feature.
 
+Linear-salience models contain `2 + 2N` words:
+
+1. bias as IEEE-754 binary32 bits;
+2. weight count `N`, from 1 through 256;
+3. `N` pairs of feature ID and IEEE-754 binary32 weight bits.
+
+Every weighted feature must be unique, supported, and present in the artifact's
+required-feature table. Bias and weights must be finite. Linear artifacts must
+declare minimum ABI 1.6 or newer. The runtime evaluates
+the ordered binary32 weights against `unit` node features with a binary64
+accumulator and clamps the sum to `[0,1]`.
+
 ## Validation and compatibility
 
 Loading verifies magic, format version, exact sizes and offsets, count limits,
@@ -78,6 +90,7 @@ outlive the runtime used to load them.
 ```sh
 le-model compile-prefix prefix.lem --fixed 2 --language en
 le-model compile-lexical-core lexical.lem --language en --language zh
+le-model compile-linear-salience learned.lem --bias 0.1 --weight 2:0.2 --language en
 le-model inspect prefix.lem
 ```
 

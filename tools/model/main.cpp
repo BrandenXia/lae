@@ -26,7 +26,9 @@ void usage(std::ostream& stream) {
               "  le-model compile-prefix OUTPUT [--fixed N | --proportion P]"
               " [--language TAG] [--model-version N]\n"
               "  le-model compile-lexical-core OUTPUT [--language TAG]"
-              " [--model-version N]\n";
+              " [--model-version N]\n"
+              "  le-model compile-linear-salience OUTPUT --weight FEATURE:WEIGHT"
+              " [--bias B] [--language TAG] [--model-version N]\n";
 }
 
 bool parse_u32(std::string_view text, std::uint32_t& value) {
@@ -75,7 +77,10 @@ void write_file(const std::string& path, std::span<const std::uint8_t> bytes) {
 }
 
 const char* type_name(std::uint32_t type) {
-    return type == LE_MODEL_PREFIX ? "prefix" : "lexical-core";
+    if (type == LE_MODEL_PREFIX) {
+        return "prefix";
+    }
+    return type == LE_MODEL_LEXICAL_CORE ? "lexical-core" : "linear-salience";
 }
 
 void inspect(const std::string& path) {
@@ -104,6 +109,14 @@ void inspect(const std::string& path) {
                   << (artifact.prefix_strategy == LE_PREFIX_FIXED ? "fixed" : "proportional")
                   << "\",\"fixed_graphemes\":" << artifact.fixed_graphemes
                   << ",\"proportion\":" << artifact.prefix_proportion << '}';
+    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE) {
+        std::cout << ",\n  \"parameters\":{\"bias\":" << artifact.linear_bias << ",\"weights\":[";
+        for (std::size_t index = 0; index < artifact.linear_weights.size(); ++index) {
+            const auto& item = artifact.linear_weights[index];
+            std::cout << (index == 0 ? "" : ",") << "{\"feature\":" << item.feature
+                      << ",\"weight\":" << item.weight << '}';
+        }
+        std::cout << "]}";
     }
     std::cout << "\n}\n";
 }
@@ -123,6 +136,8 @@ void compile(int argc, char** argv, bool lexical_core) {
         LE_PREFIX_PROPORTIONAL,
         1,
         0.5F,
+        0.0F,
+        {},
     };
     for (int index = 3; index < argc; ++index) {
         const std::string_view option(argv[index]);
@@ -150,6 +165,53 @@ void compile(int argc, char** argv, bool lexical_core) {
     write_file(argv[2], bytes);
 }
 
+void compile_linear_salience(int argc, char** argv) {
+    if (argc < 3) {
+        usage(std::cerr);
+        std::exit(2);
+    }
+    le::model::Artifact artifact{LE_ABI_VERSION,
+                                 LE_MODEL_LINEAR_SALIENCE,
+                                 1,
+                                 {},
+                                 {},
+                                 LE_PREFIX_PROPORTIONAL,
+                                 1,
+                                 0.5F,
+                                 0.0F,
+                                 {}};
+    for (int index = 3; index < argc; ++index) {
+        const std::string_view option(argv[index]);
+        if (option == "--language" && index + 1 < argc) {
+            artifact.languages.emplace_back(argv[++index]);
+        } else if (option == "--model-version" && index + 1 < argc) {
+            if (!parse_u32(argv[++index], artifact.model_version)) {
+                throw std::runtime_error("invalid model version");
+            }
+        } else if (option == "--bias" && index + 1 < argc) {
+            if (!parse_float(argv[++index], artifact.linear_bias)) {
+                throw std::runtime_error("invalid linear salience bias");
+            }
+        } else if (option == "--weight" && index + 1 < argc) {
+            const std::string_view specification(argv[++index]);
+            const auto separator = specification.find(':');
+            std::uint32_t feature = 0;
+            float weight = 0.0F;
+            if (separator == std::string_view::npos || separator == 0 ||
+                separator + 1 == specification.size() ||
+                !parse_u32(specification.substr(0, separator), feature) ||
+                !parse_float(specification.substr(separator + 1), weight)) {
+                throw std::runtime_error("invalid feature:weight specification");
+            }
+            artifact.required_features.push_back(feature);
+            artifact.linear_weights.push_back(le::model::Artifact::FeatureWeight{feature, weight});
+        } else {
+            throw std::runtime_error("unrecognized or incomplete model option");
+        }
+    }
+    write_file(argv[2], le::model::encode(artifact));
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -165,6 +227,8 @@ int main(int argc, char** argv) {
             compile(argc, argv, false);
         } else if (command == "compile-lexical-core") {
             compile(argc, argv, true);
+        } else if (command == "compile-linear-salience") {
+            compile_linear_salience(argc, argv);
         } else {
             usage(std::cerr);
             return 2;

@@ -39,6 +39,11 @@ records measure reading speed, comprehension, fixation duration/count,
 regressions, preference, reported distraction, and density. A/B results use
 paired examples and report candidate-minus-baseline descriptive deltas.
 
-There is no neural model, framework checkpoint, experiment database, runtime
-Python bridge, or claim of statistical significance. Learned salience models
-remain Milestone 9.
+Milestone 9 adds a deterministic ridge-regression trainer for a sparse linear
+salience model. Training consumes labeled snapshots of stable runtime feature
+IDs, quantizes fitted parameters to binary32, and exports a model artifact. The
+runtime only evaluates the compiled bias and weights; it does not contain the
+solver or dataset code.
+
+There is no neural network, framework checkpoint, experiment database, runtime
+Python bridge, online adaptation, or claim of statistical significance.

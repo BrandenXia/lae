@@ -16,9 +16,10 @@ static_assert(std::is_standard_layout_v<le_presentation_config_t>);
 static_assert(sizeof(le_status_t) == sizeof(std::int32_t));
 static_assert(offsetof(le_text_span_t, begin) == 0);
 static_assert(LE_ABI_VERSION_MAJOR == 1);
-static_assert(LE_ABI_VERSION_MINOR == 5);
+static_assert(LE_ABI_VERSION_MINOR == 6);
 static_assert(LE_MODEL_FORMAT_VERSION_MAJOR == 1);
 static_assert(LE_MODEL_FORMAT_VERSION_MINOR == 0);
+static_assert(LE_MODEL_LINEAR_SALIENCE == 3);
 
 int main() {
     le_runtime_t* runtime = nullptr;

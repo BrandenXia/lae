@@ -12,6 +12,7 @@ neural model:
 - prefix-candidate evaluation and grid-search optimization;
 - a pure-Python `.lem` v1 artifact exporter.
 - strategy-neutral offline plan metrics and paired human-study comparisons.
+- a deterministic ridge-regression trainer for linear unit salience.
 
 Preprocessing owns linguistic-unit and grapheme discovery. Recording those
 boundaries in the dataset prevents training from silently using segmentation
@@ -53,6 +54,8 @@ PYTHONPATH=training/src python3 -m lae_training evaluate-prefix DATASET.jsonl --
 PYTHONPATH=training/src python3 -m lae_training fit-prefix DATASET.jsonl model.lem
 PYTHONPATH=training/src python3 -m lae_training summarize-plans PLANS.jsonl
 PYTHONPATH=training/src python3 -m lae_training summarize-study STUDY.jsonl
+PYTHONPATH=training/src python3 -m lae_training \
+  fit-linear-salience SALIENCE.jsonl learned.lem
 ```
 
 `fit-prefix` emits a JSON report and a runtime-loadable artifact. With no
@@ -67,3 +70,9 @@ aggregates reading speed, comprehension, fixation duration/count, regressions,
 preference, distraction, and density. Comparisons are paired and always report
 candidate minus baseline. See [the evaluation contract](../docs/evaluation.md)
 for both schemas and metric semantics.
+
+Salience-training records contain a language tag and labeled units whose inputs
+are stable numeric IR feature IDs. The trainer fits a bias and sparse feature
+weights, quantizes them to runtime binary32 values, reports MAE/RMSE/`R²`, and
+exports `LE_MODEL_LINEAR_SALIENCE`. See
+[the learned-model contract](../docs/learned-model.md).

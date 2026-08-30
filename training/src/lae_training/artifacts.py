@@ -15,9 +15,11 @@ MAGIC = b"LAEMODL\0"
 FORMAT_VERSION = (1, 0)
 HEADER_SIZE = 64
 MAXIMUM_ARTIFACT_SIZE = 16 * 1024 * 1024
-ABI_VERSION = (1 << 16) | 5
+ABI_VERSION = (1 << 16) | 6
 MODEL_PREFIX = 1
 MODEL_LEXICAL_CORE = 2
+MODEL_LINEAR_SALIENCE = 3
+LINEAR_SALIENCE_MINIMUM_ABI = (1 << 16) | 6
 FEATURE_LEXICAL_CORE = 0x00010001
 PREFIX_PROPORTIONAL = 1
 PREFIX_FIXED = 2
@@ -54,6 +56,18 @@ def _languages(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
+def _binary32(value: float, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a number")
+    try:
+        result = struct.unpack("<f", struct.pack("<f", value))[0]
+    except (OverflowError, struct.error) as error:
+        raise ValueError(f"{field} must fit IEEE-754 binary32") from error
+    if not math.isfinite(result):
+        raise ValueError(f"{field} must be finite")
+    return result
+
+
 def _encode(
     *,
     model_type: int,
@@ -66,6 +80,8 @@ def _encode(
     model_version = _u32(model_version, "model_version", nonzero=True)
     minimum_abi = _u32(minimum_abi, "minimum_abi")
     language_values = _languages(languages)
+    if len(required_features) > 256 or len(set(required_features)) != len(required_features):
+        raise ValueError("required features must be unique and contain at most 256 entries")
     language_table = b"".join(
         struct.pack("<H", len(language.encode("ascii"))) + language.encode("ascii")
         for language in language_values
@@ -142,6 +158,43 @@ def build_lexical_core_artifact(
         languages=languages,
         required_features=(FEATURE_LEXICAL_CORE,),
         parameters=b"",
+    )
+
+
+def build_linear_salience_artifact(
+    bias: float,
+    weights: Iterable[tuple[int, float]],
+    *,
+    languages: Iterable[str] = (),
+    model_version: int = 1,
+    minimum_abi: int = ABI_VERSION,
+) -> bytes:
+    """Compile a linear unit-salience predictor into artifact format v1."""
+
+    minimum_abi = _u32(minimum_abi, "minimum_abi")
+    if minimum_abi < LINEAR_SALIENCE_MINIMUM_ABI:
+        raise ValueError("linear model minimum ABI must be at least 1.6")
+    bias = _binary32(bias, "linear bias")
+    values: list[tuple[int, float]] = []
+    seen: set[int] = set()
+    for feature, weight in weights:
+        feature = _u32(feature, "linear feature")
+        if feature in seen:
+            raise ValueError(f"duplicate linear feature: {feature}")
+        seen.add(feature)
+        values.append((feature, _binary32(weight, f"weight for feature {feature}")))
+    if not values or len(values) > 256:
+        raise ValueError("linear model must contain between 1 and 256 weights")
+    parameters = struct.pack("<fI", bias, len(values)) + b"".join(
+        struct.pack("<If", feature, weight) for feature, weight in values
+    )
+    return _encode(
+        model_type=MODEL_LINEAR_SALIENCE,
+        model_version=model_version,
+        minimum_abi=minimum_abi,
+        languages=languages,
+        required_features=tuple(feature for feature, _ in values),
+        parameters=parameters,
     )
 
 

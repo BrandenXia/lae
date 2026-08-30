@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.8.0 LANGUAGES C CXX)
+project(lae VERSION 0.9.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -216,6 +216,24 @@ if(LAE_BUILD_TESTS)
             DEPENDS model-cli-compile
             PASS_REGULAR_EXPRESSION "\"fixation_salience\":0.500"
         )
+        set(LE_TEST_LINEAR_MODEL ${CMAKE_CURRENT_BINARY_DIR}/test-linear.lem)
+        add_test(NAME model-linear-compile
+            COMMAND le-model compile-linear-salience ${LE_TEST_LINEAR_MODEL}
+                    --bias 0 --weight 2:0.2 --language en
+        )
+        add_test(NAME model-linear-inspect COMMAND le-model inspect ${LE_TEST_LINEAR_MODEL})
+        set_tests_properties(model-linear-inspect PROPERTIES
+            DEPENDS model-linear-compile
+            PASS_REGULAR_EXPRESSION "\"type\":\"linear-salience\""
+        )
+        add_test(NAME model-linear-runtime
+            COMMAND le-cli --artifact ${LE_TEST_LINEAR_MODEL} --language en --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt
+        )
+        set_tests_properties(model-linear-runtime PROPERTIES
+            DEPENDS model-linear-compile
+            PASS_REGULAR_EXPRESSION "\"lexical_salience\":1.000"
+        )
         set(LE_TEST_TRAINED_MODEL ${CMAKE_CURRENT_BINARY_DIR}/test-trained-prefix.lem)
         add_test(NAME training-fit-prefix
             COMMAND ${CMAKE_COMMAND} -E env
@@ -241,6 +259,32 @@ if(LAE_BUILD_TESTS)
         set_tests_properties(training-model-runtime PROPERTIES
             DEPENDS training-fit-prefix
             PASS_REGULAR_EXPRESSION "\"fixation_salience\":0.500"
+        )
+        set(LE_TEST_TRAINED_LINEAR ${CMAKE_CURRENT_BINARY_DIR}/test-trained-linear.lem)
+        add_test(NAME training-fit-linear
+            COMMAND ${CMAKE_COMMAND} -E env
+                    PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/training/src
+                    ${Python3_EXECUTABLE} -m lae_training fit-linear-salience
+                    ${CMAKE_CURRENT_SOURCE_DIR}/training/tests/fixtures/salience-training.jsonl
+                    ${LE_TEST_TRAINED_LINEAR} --ridge 0
+        )
+        set_tests_properties(training-fit-linear PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"root_mean_square_error\""
+        )
+        add_test(NAME training-linear-inspect
+            COMMAND le-model inspect ${LE_TEST_TRAINED_LINEAR}
+        )
+        set_tests_properties(training-linear-inspect PROPERTIES
+            DEPENDS training-fit-linear
+            PASS_REGULAR_EXPRESSION "\"type\":\"linear-salience\""
+        )
+        add_test(NAME training-linear-runtime
+            COMMAND le-cli --artifact ${LE_TEST_TRAINED_LINEAR} --language en --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt
+        )
+        set_tests_properties(training-linear-runtime PROPERTIES
+            DEPENDS training-fit-linear
+            PASS_REGULAR_EXPRESSION "\"lexical_salience\":1.000"
         )
     endif()
 endif()

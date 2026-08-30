@@ -15,6 +15,8 @@ reordered or reinterpreted within ABI major version 1.
 
 ABI 1.5 adds the opaque model lifecycle, metadata discovery,
 artifact-driven signal generation, and high-level model processing functions.
+ABI 1.6 adds the `LE_MODEL_LINEAR_SALIENCE` model type without changing any
+function signature or public structure layout.
 
 ## Function contracts
 
@@ -62,6 +64,10 @@ Model accessors expose type, producer-defined model version, minimum ABI,
 supported languages, and required feature identifiers. Zero languages means
 unrestricted. `le_model_supports_language` matches tags case-insensitively and
 treats a primary capability such as `en` as supporting `en-US`.
+
+`LE_MODEL_LINEAR_SALIENCE` evaluates artifact weights against stable features
+on each `LE_NODE_UNIT`. Missing features contribute zero; positive clamped
+predictions become fixation and lexical salience signals over the unit span.
 
 ## Processing options
 

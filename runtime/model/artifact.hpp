@@ -37,6 +37,12 @@ struct Artifact {
     std::uint32_t prefix_strategy;
     std::uint32_t fixed_graphemes;
     float prefix_proportion;
+    float linear_bias = 0.0F;
+    struct FeatureWeight {
+        std::uint32_t feature;
+        float weight;
+    };
+    std::vector<FeatureWeight> linear_weights;
 };
 
 [[nodiscard]] Artifact load(std::span<const std::uint8_t> bytes);

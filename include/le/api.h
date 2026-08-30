@@ -1,0 +1,85 @@
+#ifndef LE_API_H
+#define LE_API_H
+
+#include "le/types.h"
+#include "le/version.h"
+
+#if defined(_WIN32) && defined(LE_SHARED)
+#if defined(LE_BUILDING_RUNTIME)
+#define LE_API __declspec(dllexport)
+#else
+#define LE_API __declspec(dllimport)
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define LE_API __attribute__((visibility("default")))
+#else
+#define LE_API
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct le_runtime le_runtime_t;
+typedef struct le_result le_result_t;
+
+typedef struct le_runtime_config {
+    uint32_t struct_size;
+    uint32_t flags;
+} le_runtime_config_t;
+
+#define LE_RUNTIME_CONFIG_V1_SIZE ((uint32_t)sizeof(le_runtime_config_t))
+
+typedef uint32_t le_prefix_strategy_t;
+#define LE_PREFIX_PROPORTIONAL ((le_prefix_strategy_t)1u)
+#define LE_PREFIX_FIXED ((le_prefix_strategy_t)2u)
+
+typedef struct le_process_options {
+    uint32_t struct_size;
+    uint32_t flags;
+    le_string_view_t language;
+    le_prefix_strategy_t prefix_strategy;
+    uint32_t fixed_graphemes;
+    float prefix_proportion;
+    float emphasis_strength;
+} le_process_options_t;
+
+#define LE_PROCESS_OPTIONS_V1_SIZE ((uint32_t)sizeof(le_process_options_t))
+
+/* Initialize a v1 configuration with default values. */
+LE_API void le_runtime_config_init(le_runtime_config_t* config);
+
+/* Initialize v1 options: generic analysis, 50% prefix, strength 1.0. */
+LE_API void le_process_options_init(le_process_options_t* options);
+
+/* Create a runtime. config may be NULL. out_runtime must be non-NULL. */
+LE_API le_status_t le_runtime_create(const le_runtime_config_t* config, le_runtime_t** out_runtime);
+
+/* Destroy a runtime. NULL is accepted. Existing results remain valid. */
+LE_API void le_runtime_destroy(le_runtime_t* runtime);
+
+/*
+ * Process UTF-8 text using generic Unicode analysis. options may be NULL.
+ * Text is borrowed only for this call. On success, the caller owns out_result.
+ */
+LE_API le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
+                              const le_process_options_t* options, le_result_t** out_result);
+
+/* Borrow this thread's diagnostic until its next failing call; it may be truncated. */
+LE_API le_string_view_t le_runtime_last_error(const le_runtime_t* runtime);
+
+/* Return a static, null-terminated name for a status code. */
+LE_API const char* le_status_string(le_status_t status);
+
+/* Result accessors are thread-safe because results are immutable. */
+LE_API size_t le_result_emphasis_count(const le_result_t* result);
+LE_API const le_emphasis_t* le_result_emphasis_data(const le_result_t* result);
+
+/* Destroy a result. NULL is accepted. */
+LE_API void le_result_destroy(le_result_t* result);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

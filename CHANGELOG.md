@@ -10,6 +10,8 @@ model artifact format.
 
 - Dependency-free Python runtime binding for high-level processing, model
   loading, metadata discovery, native diagnostics, and explicit ownership.
+- Swift package with safe runtime/model ownership, artifact processing, native
+  diagnostics, and UTF-8-byte-to-`String.Index` span conversion.
 
 ## [0.10.0] - 2026-08-30
 

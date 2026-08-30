@@ -112,3 +112,10 @@ The first supported host-language binding lives under `bindings/python`. It is
 a dependency-free wrapper over the shared C ABI, copies immutable emphasis
 plans into Python values, and preserves UTF-8 byte offsets. It neither accesses
 C++ internals nor imports the offline training package.
+
+The companion Swift package imports the same public headers through a system
+library target. It wraps opaque handles in deterministic reference types,
+copies emphasis plans into Swift values, and converts validated UTF-8 byte
+spans to `String.Index` ranges only when the offsets form valid Swift string
+boundaries. This Python/Swift pair exercises two substantially different FFI
+and string models without adding a privileged internal API.

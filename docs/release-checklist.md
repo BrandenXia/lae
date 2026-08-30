@@ -22,6 +22,8 @@ Use this checklist for a tagged LAE release.
   run through `find_package(le CONFIG REQUIRED)`.
 - [ ] Python wheel and source distribution contain the declared version,
   console entry point, and MIT license.
+- [ ] Python and Swift binding integration tests pass against the release shared
+  library.
 - [ ] Shared-library symbol audit exposes only the documented C ABI.
 - [ ] `git diff --check` passes and the release worktree is clean.
 

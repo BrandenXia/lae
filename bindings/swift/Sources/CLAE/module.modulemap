@@ -1,0 +1,5 @@
+module CLAE [system] {
+    header "shim.h"
+    link "le_runtime"
+    export *
+}

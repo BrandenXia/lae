@@ -84,6 +84,21 @@ Set `PYTHONPATH=bindings/python/src` when using the binding from a source
 checkout. See the [Python binding guide](docs/python-binding.md) for model
 loading, ownership, and cross-platform library discovery.
 
+The Swift package wraps the same installed C ABI and retains its UTF-8 byte
+coordinate system:
+
+```swift
+import LAE
+
+let runtime = try Runtime()
+defer { runtime.close() }
+let plan = try runtime.process("éclair")
+let emphasizedText = plan[0].span.substring(in: "éclair")
+```
+
+See the [Swift binding guide](docs/swift-binding.md) for Swift Package Manager
+integration and native library search-path configuration.
+
 Try the C-ABI-only CLI:
 
 ```sh
@@ -133,6 +148,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [learned model](docs/learned-model.md),
 [provider plugin ABI](docs/provider-plugin-abi.md),
 [Python binding](docs/python-binding.md),
+[Swift binding](docs/swift-binding.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and

@@ -18,8 +18,7 @@ std::vector<Emphasis> process(const Text& text, const PipelineOptions& options) 
     const auto analysis = analyze(text, options.language);
     const PrefixReadingModel model(options.prefix);
     const auto signals = model.generate(text, analysis);
-    const BinaryBoldPolicy policy(options.emphasis_strength);
-    return policy.apply(signals);
+    return generate_emphasis(signals, options.presentation);
 }
 
 } // namespace le::core

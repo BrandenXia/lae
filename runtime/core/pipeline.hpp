@@ -14,7 +14,7 @@ namespace le::core {
 struct PipelineOptions {
     std::string_view language;
     PrefixModelConfig prefix;
-    float emphasis_strength;
+    PresentationConfig presentation;
 };
 
 [[nodiscard]] Analysis analyze(const Text& text, std::string_view language);

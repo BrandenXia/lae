@@ -34,15 +34,17 @@ ordered non-overlapping siblings, contained grapheme-safe spans, finite unique
 features, and ordered language regions with normalized confidence.
 
 The prefix reading model chooses a fixed count or proportion of graphemes from
-each generic unit and emits fixation-salience signals. The binary policy maps
-positive fixation salience to normalized emphasis strength. Output spans are
-ordered and non-overlapping.
+each generic unit and emits per-grapheme fixation-salience signals. Presentation
+is a separate stage: the binary policy thresholds and merges signals at one
+strength, while the variable policy interpolates strength from salience. Output
+spans remain ordered and non-overlapping.
 
 ## Runtime properties
 
 - Input is borrowed and immutable for the duration of `le_process`.
+- A long-lived analysis owns one immutable source snapshot for later stages.
 - Results are immutable and own one contiguous emphasis array.
-- A result remains valid after its creating runtime is destroyed.
+- Analyses, signals, and results remain valid after their runtime is destroyed.
 - Processing has no global mutable model or provider state and is deterministic.
 - Diagnostics are thread-local; each thread observes its own most recent error.
 - `utf8proc` supplies standards-based UTF-8 decoding and extended grapheme

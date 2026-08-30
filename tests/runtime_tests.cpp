@@ -106,6 +106,33 @@ void contract_tests() {
     check(custom_result.size() == 1 && std::fabs(custom_result[0].strength - 0.25F) < 0.0001F,
           "custom emphasis strength");
 
+    le_process_options_t legacy;
+    le_process_options_init(&legacy);
+    legacy.struct_size = LE_PROCESS_OPTIONS_V1_SIZE;
+    legacy.presentation_policy = 999;
+    legacy.minimum_emphasis_strength = 0.9F;
+    const auto legacy_result = run("reading", &legacy);
+    check(legacy_result.size() == 1 && legacy_result[0].span.end == 4,
+          "v1 process options ignore appended policy fields");
+
+    le_process_options_t variable;
+    le_process_options_init(&variable);
+    variable.presentation_policy = LE_POLICY_VARIABLE_STRENGTH;
+    variable.minimum_emphasis_strength = 0.2F;
+    const auto variable_result = run("reading", &variable);
+    check(variable_result.size() == 4, "variable policy emits distinct-strength spans");
+    check(std::fabs(variable_result.front().strength - 1.0F) < 0.0001F,
+          "variable policy starts at maximum strength");
+    check(std::fabs(variable_result.back().strength - 0.6F) < 0.0001F,
+          "variable policy interpolates final selected grapheme");
+
+    le_process_options_t threshold;
+    le_process_options_init(&threshold);
+    threshold.salience_threshold = 0.75F;
+    const auto threshold_result = run("reading", &threshold);
+    check(threshold_result.size() == 1 && threshold_result[0].span.end == 2,
+          "binary policy applies salience threshold before merging");
+
     const std::string invalid("\xF0\x28\x8C\x28", 4);
     le_status_t invalid_status = LE_OK;
     const auto invalid_output = run(invalid, nullptr, &invalid_status);
@@ -148,6 +175,24 @@ void contract_tests() {
     check(le_analysis_language_region_data(nullptr) == nullptr,
           "null analysis region data is null");
     le_analysis_destroy(nullptr);
+
+    le_signal_result_t* signals = reinterpret_cast<le_signal_result_t*>(0x1);
+    check(le_generate_prefix_signals(runtime, nullptr, nullptr, &signals) ==
+              LE_ERROR_INVALID_ARGUMENT,
+          "signal generation requires analysis");
+    check(signals == nullptr, "out_signals cleared on error");
+    check(le_signal_result_count(nullptr) == 0, "null signal count is zero");
+    check(le_signal_result_data(nullptr) == nullptr, "null signal data is null");
+    le_signal_result_destroy(nullptr);
+
+    check(le_analyze(runtime, le_string_view_t{"abc", 3}, le_string_view_t{nullptr, 0},
+                     &analysis) == LE_OK,
+          "analysis owns source text");
+    const auto analysis_text = le_analysis_text(analysis);
+    check(analysis_text.size == 3 &&
+              std::string_view(analysis_text.data, analysis_text.size) == "abc",
+          "analysis exposes immutable source snapshot");
+    le_analysis_destroy(analysis);
 
     check(le_result_emphasis_count(nullptr) == 0, "null result count is zero");
     check(le_result_emphasis_data(nullptr) == nullptr, "null result data is null");

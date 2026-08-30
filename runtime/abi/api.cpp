@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 struct le_runtime {
@@ -26,11 +27,17 @@ struct le_result {
 };
 
 struct le_analysis {
+    std::string text;
+    le::core::Analysis core;
     std::vector<le_analysis_node_t> nodes;
     std::vector<le_node_id_t> children;
     std::vector<le_feature_t> features;
-    std::vector<std::string> languages;
     std::vector<le_language_region_t> language_regions;
+};
+
+struct le_signal_result {
+    std::vector<le::core::ReadingSignal> core;
+    std::vector<le_reading_signal_t> signals;
 };
 
 namespace {
@@ -96,13 +103,16 @@ le_node_kind_t to_abi(le::core::NodeKind kind) {
     throw std::logic_error("unrecognized internal node kind");
 }
 
-std::unique_ptr<le_analysis> make_analysis(const le::core::Analysis& source) {
+std::unique_ptr<le_analysis> make_analysis(le::core::Analysis source, std::string_view text) {
     auto result = std::make_unique<le_analysis>();
-    if (source.nodes.size() > std::numeric_limits<std::uint32_t>::max()) {
+    result->text = text;
+    result->core = std::move(source);
+    const auto& stable_source = result->core;
+    if (stable_source.nodes.size() > std::numeric_limits<std::uint32_t>::max()) {
         throw std::length_error("analysis node count exceeds v1 identifier capacity");
     }
-    result->nodes.reserve(source.nodes.size());
-    for (const auto& node : source.nodes) {
+    result->nodes.reserve(stable_source.nodes.size());
+    for (const auto& node : stable_source.nodes) {
         constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
         if (result->children.size() > maximum ||
             node.children.size() > maximum - result->children.size() ||
@@ -125,14 +135,10 @@ std::unique_ptr<le_analysis> make_analysis(const le::core::Analysis& source) {
                                first_feature, static_cast<std::uint32_t>(node.features.size())});
     }
 
-    result->languages.reserve(source.language_regions.size());
-    for (const auto& region : source.language_regions) {
-        result->languages.push_back(region.language);
-    }
-    result->language_regions.reserve(source.language_regions.size());
-    for (std::size_t index = 0; index < source.language_regions.size(); ++index) {
-        const auto& source_region = source.language_regions[index];
-        const auto& language = result->languages[index];
+    result->language_regions.reserve(stable_source.language_regions.size());
+    for (std::size_t index = 0; index < stable_source.language_regions.size(); ++index) {
+        const auto& source_region = stable_source.language_regions[index];
+        const auto& language = source_region.language;
         result->language_regions.push_back(le_language_region_t{
             le_text_span_t{source_region.span.begin().value(), source_region.span.end().value()},
             le_string_view_t{language.data(), language.size()}, source_region.confidence, 0});
@@ -140,9 +146,101 @@ std::unique_ptr<le_analysis> make_analysis(const le::core::Analysis& source) {
     return result;
 }
 
+std::unique_ptr<le_signal_result> make_signals(std::vector<le::core::ReadingSignal> source) {
+    auto result = std::make_unique<le_signal_result>();
+    result->core = std::move(source);
+    result->signals.reserve(result->core.size());
+    for (const auto& signal : result->core) {
+        result->signals.push_back(le_reading_signal_t{
+            le_text_span_t{signal.span.begin().value(), signal.span.end().value()},
+            signal.fixation_salience, signal.lexical_salience, signal.reading_difficulty, 0});
+    }
+    return result;
+}
+
+std::unique_ptr<le_result> make_result(const std::vector<le::core::Emphasis>& source) {
+    auto result = std::make_unique<le_result>();
+    result->emphasis.reserve(source.size());
+    for (const auto& item : source) {
+        result->emphasis.push_back(
+            le_emphasis_t{le_text_span_t{item.span.begin().value(), item.span.end().value()},
+                          item.strength, item.style_class});
+    }
+    return result;
+}
+
+le::core::PrefixModelConfig prefix_defaults() {
+    return le::core::PrefixModelConfig{le::core::PrefixStrategy::proportional, 1, 0.5F};
+}
+
+le::core::PresentationConfig presentation_defaults() {
+    return le::core::PresentationConfig{le::core::PresentationPolicy::binary, 0.0F, 0.0F, 1.0F};
+}
+
 le::core::PipelineOptions defaults() {
-    return le::core::PipelineOptions{
-        "und", le::core::PrefixModelConfig{le::core::PrefixStrategy::proportional, 1, 0.5F}, 1.0F};
+    return le::core::PipelineOptions{"und", prefix_defaults(), presentation_defaults()};
+}
+
+le_status_t read_prefix_config(const le_prefix_model_config_t* source,
+                               le::core::PrefixModelConfig& target) {
+    target = prefix_defaults();
+    if (source == nullptr) {
+        return LE_OK;
+    }
+    if (source->struct_size < LE_PREFIX_MODEL_CONFIG_V1_SIZE) {
+        return invalid_argument("prefix model config struct_size is smaller than v1");
+    }
+    if (source->flags != 0 || source->reserved != 0) {
+        return invalid_argument("prefix model config contains unsupported fields");
+    }
+    if (source->strategy != LE_PREFIX_PROPORTIONAL && source->strategy != LE_PREFIX_FIXED) {
+        return invalid_argument("prefix model strategy is not recognized");
+    }
+    if (!std::isfinite(source->proportion) || source->proportion < 0.0F ||
+        source->proportion > 1.0F) {
+        return invalid_argument("prefix model proportion must be finite and in [0, 1]");
+    }
+    target = le::core::PrefixModelConfig{source->strategy == LE_PREFIX_FIXED
+                                             ? le::core::PrefixStrategy::fixed
+                                             : le::core::PrefixStrategy::proportional,
+                                         source->fixed_graphemes, source->proportion};
+    return LE_OK;
+}
+
+le_status_t validate_presentation(le_presentation_policy_t policy, float threshold,
+                                  float minimum_strength, float maximum_strength,
+                                  le::core::PresentationConfig& target) {
+    if (policy != LE_POLICY_BINARY && policy != LE_POLICY_VARIABLE_STRENGTH) {
+        return invalid_argument("presentation policy is not recognized");
+    }
+    if (!std::isfinite(threshold) || threshold < 0.0F || threshold > 1.0F) {
+        return invalid_argument("salience threshold must be finite and in [0, 1]");
+    }
+    if (!std::isfinite(minimum_strength) || !std::isfinite(maximum_strength) ||
+        minimum_strength < 0.0F || maximum_strength > 1.0F || minimum_strength > maximum_strength) {
+        return invalid_argument("presentation strengths must satisfy 0 <= minimum <= maximum <= 1");
+    }
+    target = le::core::PresentationConfig{policy == LE_POLICY_VARIABLE_STRENGTH
+                                              ? le::core::PresentationPolicy::variable_strength
+                                              : le::core::PresentationPolicy::binary,
+                                          threshold, minimum_strength, maximum_strength};
+    return LE_OK;
+}
+
+le_status_t read_presentation_config(const le_presentation_config_t* source,
+                                     le::core::PresentationConfig& target) {
+    target = presentation_defaults();
+    if (source == nullptr) {
+        return LE_OK;
+    }
+    if (source->struct_size < LE_PRESENTATION_CONFIG_V1_SIZE) {
+        return invalid_argument("presentation config struct_size is smaller than v1");
+    }
+    if (source->flags != 0) {
+        return invalid_argument("presentation config contains unsupported flags");
+    }
+    return validate_presentation(source->policy, source->salience_threshold,
+                                 source->minimum_strength, source->maximum_strength, target);
 }
 
 le_status_t read_options(const le_process_options_t* source, le::core::PipelineOptions& target) {
@@ -152,6 +250,10 @@ le_status_t read_options(const le_process_options_t* source, le::core::PipelineO
     }
     if (source->struct_size < LE_PROCESS_OPTIONS_V1_SIZE) {
         return invalid_argument("process options struct_size is smaller than v1");
+    }
+    if (source->struct_size > LE_PROCESS_OPTIONS_V1_SIZE &&
+        source->struct_size < LE_PROCESS_OPTIONS_V2_SIZE) {
+        return invalid_argument("process options struct_size is between known ABI versions");
     }
     if (source->flags != 0) {
         return invalid_argument("process options contain unsupported flags");
@@ -177,7 +279,13 @@ le_status_t read_options(const le_process_options_t* source, le::core::PipelineO
                                                     ? le::core::PrefixStrategy::fixed
                                                     : le::core::PrefixStrategy::proportional,
                                                 source->fixed_graphemes, source->prefix_proportion};
-    target.emphasis_strength = source->emphasis_strength;
+    target.presentation = presentation_defaults();
+    target.presentation.maximum_strength = source->emphasis_strength;
+    if (source->struct_size >= LE_PROCESS_OPTIONS_V2_SIZE) {
+        return validate_presentation(source->presentation_policy, source->salience_threshold,
+                                     source->minimum_emphasis_strength, source->emphasis_strength,
+                                     target.presentation);
+    }
     return LE_OK;
 }
 
@@ -193,13 +301,30 @@ void le_runtime_config_init(le_runtime_config_t* config) {
 
 void le_process_options_init(le_process_options_t* options) {
     if (options != nullptr) {
-        *options = le_process_options_t{LE_PROCESS_OPTIONS_V1_SIZE,
+        *options = le_process_options_t{LE_PROCESS_OPTIONS_V2_SIZE,
                                         0,
                                         le_string_view_t{nullptr, 0},
                                         LE_PREFIX_PROPORTIONAL,
                                         1,
                                         0.5F,
-                                        1.0F};
+                                        1.0F,
+                                        LE_POLICY_BINARY,
+                                        0.0F,
+                                        0.0F};
+    }
+}
+
+void le_prefix_model_config_init(le_prefix_model_config_t* config) {
+    if (config != nullptr) {
+        *config = le_prefix_model_config_t{
+            LE_PREFIX_MODEL_CONFIG_V1_SIZE, 0, LE_PREFIX_PROPORTIONAL, 1, 0.5F, 0};
+    }
+}
+
+void le_presentation_config_init(le_presentation_config_t* config) {
+    if (config != nullptr) {
+        *config = le_presentation_config_t{
+            LE_PRESENTATION_CONFIG_V1_SIZE, 0, LE_POLICY_BINARY, 0.0F, 0.0F, 1.0F};
     }
 }
 
@@ -254,8 +379,8 @@ le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text, le_string_v
         const std::string_view bytes =
             text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
         const le::core::Text core_text(bytes);
-        const auto core_analysis = le::core::analyze(core_text, language_view(language));
-        auto analysis = make_analysis(core_analysis);
+        auto core_analysis = le::core::analyze(core_text, language_view(language));
+        auto analysis = make_analysis(std::move(core_analysis), bytes);
         *out_analysis = analysis.release();
         return LE_OK;
     } catch (const le::core::InvalidUtf8& error) {
@@ -307,7 +432,98 @@ const le_language_region_t* le_analysis_language_region_data(const le_analysis_t
                : analysis->language_regions.data();
 }
 
+le_string_view_t le_analysis_text(const le_analysis_t* analysis) {
+    return analysis == nullptr ? le_string_view_t{nullptr, 0}
+                               : le_string_view_t{analysis->text.data(), analysis->text.size()};
+}
+
 void le_analysis_destroy(le_analysis_t* analysis) { delete analysis; }
+
+le_status_t le_generate_prefix_signals(le_runtime_t* runtime, const le_analysis_t* analysis,
+                                       const le_prefix_model_config_t* config,
+                                       le_signal_result_t** out_signals) {
+    if (out_signals == nullptr) {
+        return invalid_argument("out_signals is null");
+    }
+    *out_signals = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (analysis == nullptr) {
+        return invalid_argument("analysis is null");
+    }
+    try {
+        le::core::PrefixModelConfig model_config = prefix_defaults();
+        const auto config_status = read_prefix_config(config, model_config);
+        if (config_status != LE_OK) {
+            return config_status;
+        }
+        const std::string_view bytes(analysis->text);
+        const le::core::Text core_text(bytes);
+        le::core::validate_analysis(core_text, analysis->core);
+        const le::core::PrefixReadingModel model(model_config);
+        auto signals = make_signals(model.generate(core_text, analysis->core));
+        *out_signals = signals.release();
+        return LE_OK;
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate reading signals");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while generating reading signals");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+size_t le_signal_result_count(const le_signal_result_t* signals) {
+    return signals == nullptr ? 0 : signals->signals.size();
+}
+
+const le_reading_signal_t* le_signal_result_data(const le_signal_result_t* signals) {
+    return signals == nullptr || signals->signals.empty() ? nullptr : signals->signals.data();
+}
+
+void le_signal_result_destroy(le_signal_result_t* signals) { delete signals; }
+
+le_status_t le_generate_emphasis(le_runtime_t* runtime, const le_signal_result_t* signals,
+                                 const le_presentation_config_t* config, le_result_t** out_result) {
+    if (out_result == nullptr) {
+        return invalid_argument("out_result is null");
+    }
+    *out_result = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (signals == nullptr) {
+        return invalid_argument("signals is null");
+    }
+
+    try {
+        le::core::PresentationConfig presentation_config = presentation_defaults();
+        const auto config_status = read_presentation_config(config, presentation_config);
+        if (config_status != LE_OK) {
+            return config_status;
+        }
+        const auto emphasis = le::core::generate_emphasis(signals->core, presentation_config);
+        auto result = make_result(emphasis);
+        *out_result = result.release();
+        return LE_OK;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate emphasis result");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while generating emphasis");
+        return LE_ERROR_INTERNAL;
+    }
+}
 
 le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
                        const le_process_options_t* options, le_result_t** out_result) {
@@ -337,13 +553,7 @@ le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
         const le::core::Text core_text(bytes);
         const auto core_emphasis = le::core::process(core_text, pipeline_options);
 
-        auto result = std::make_unique<le_result>();
-        result->emphasis.reserve(core_emphasis.size());
-        for (const auto& item : core_emphasis) {
-            result->emphasis.push_back(
-                le_emphasis_t{le_text_span_t{item.span.begin().value(), item.span.end().value()},
-                              item.strength, item.style_class});
-        }
+        auto result = make_result(core_emphasis);
         *out_result = result.release();
         return LE_OK;
     } catch (const le::core::InvalidUtf8& error) {

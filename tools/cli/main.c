@@ -6,9 +6,10 @@
 #include <string.h>
 
 static void usage(FILE* stream) {
-    fputs("Usage: le-cli [--language TAG] [--dump-analysis]\n"
-          "              [--fixed N | --proportion P] [--strength S] [FILE]\n"
-          "Reads UTF-8 from FILE or stdin and prints JSON emphasis or analysis.\n",
+    fputs("Usage: le-cli [--language TAG] [--dump-analysis | --dump-signals]\n"
+          "              [--fixed N | --proportion P] [--policy binary|variable]\n"
+          "              [--threshold S] [--min-strength S] [--strength S] [FILE]\n"
+          "Reads UTF-8 from FILE or stdin and prints JSON for the selected stage.\n",
           stream);
 }
 
@@ -68,6 +69,22 @@ static void print_analysis(const le_analysis_t* analysis) {
                region_index + 1 == region_count ? "" : ",");
     }
     fputs("  ]\n}\n", stdout);
+}
+
+static void print_signals(const le_signal_result_t* signals) {
+    size_t count = le_signal_result_count(signals);
+    const le_reading_signal_t* items = le_signal_result_data(signals);
+    size_t index;
+    fputs("[\n", stdout);
+    for (index = 0; index < count; ++index) {
+        printf("  {\"begin\":%llu,\"end\":%llu,\"fixation_salience\":%.3f,"
+               "\"lexical_salience\":%.3f,\"reading_difficulty\":%.3f}%s\n",
+               (unsigned long long)items[index].span.begin,
+               (unsigned long long)items[index].span.end, (double)items[index].fixation_salience,
+               (double)items[index].lexical_salience, (double)items[index].reading_difficulty,
+               index + 1 == count ? "" : ",");
+    }
+    fputs("]\n", stdout);
 }
 
 static int parse_float(const char* text, float* value) {
@@ -135,10 +152,12 @@ int main(int argc, char** argv) {
     le_runtime_t* runtime = NULL;
     le_result_t* result = NULL;
     le_analysis_t* analysis = NULL;
+    le_signal_result_t* signals = NULL;
     le_status_t status;
     int index;
     int exit_code = 1;
     int dump_analysis = 0;
+    int dump_signals = 0;
 
     le_process_options_init(&options);
     for (index = 1; index < argc; ++index) {
@@ -159,11 +178,33 @@ int main(int argc, char** argv) {
                 fputs("Invalid emphasis strength.\n", stderr);
                 return 2;
             }
+        } else if (strcmp(argv[index], "--min-strength") == 0 && index + 1 < argc) {
+            if (!parse_float(argv[++index], &options.minimum_emphasis_strength)) {
+                fputs("Invalid minimum emphasis strength.\n", stderr);
+                return 2;
+            }
+        } else if (strcmp(argv[index], "--threshold") == 0 && index + 1 < argc) {
+            if (!parse_float(argv[++index], &options.salience_threshold)) {
+                fputs("Invalid salience threshold.\n", stderr);
+                return 2;
+            }
+        } else if (strcmp(argv[index], "--policy") == 0 && index + 1 < argc) {
+            const char* policy = argv[++index];
+            if (strcmp(policy, "binary") == 0) {
+                options.presentation_policy = LE_POLICY_BINARY;
+            } else if (strcmp(policy, "variable") == 0) {
+                options.presentation_policy = LE_POLICY_VARIABLE_STRENGTH;
+            } else {
+                fputs("Policy must be binary or variable.\n", stderr);
+                return 2;
+            }
         } else if (strcmp(argv[index], "--language") == 0 && index + 1 < argc) {
             const char* language = argv[++index];
             options.language = (le_string_view_t){language, strlen(language)};
         } else if (strcmp(argv[index], "--dump-analysis") == 0) {
             dump_analysis = 1;
+        } else if (strcmp(argv[index], "--dump-signals") == 0) {
+            dump_signals = 1;
         } else if (strcmp(argv[index], "--help") == 0) {
             usage(stdout);
             return 0;
@@ -173,6 +214,11 @@ int main(int argc, char** argv) {
         } else {
             path = argv[index];
         }
+    }
+
+    if (dump_analysis && dump_signals) {
+        fputs("Choose only one dump stage.\n", stderr);
+        return 2;
     }
 
     if (path != NULL) {
@@ -192,7 +238,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Runtime creation failed: %s\n", le_status_string(status));
         goto cleanup;
     }
-    if (dump_analysis) {
+    if (dump_analysis || dump_signals) {
         status =
             le_analyze(runtime, (le_string_view_t){text, text_size}, options.language, &analysis);
     } else {
@@ -200,13 +246,31 @@ int main(int argc, char** argv) {
     }
     if (status != LE_OK) {
         le_string_view_t detail = le_runtime_last_error(runtime);
-        fprintf(stderr, "%s failed: %s: %.*s\n", dump_analysis ? "Analysis" : "Processing",
-                le_status_string(status), (int)detail.size, detail.data == NULL ? "" : detail.data);
+        fprintf(stderr, "%s failed: %s: %.*s\n",
+                dump_analysis || dump_signals ? "Analysis" : "Processing", le_status_string(status),
+                (int)detail.size, detail.data == NULL ? "" : detail.data);
         goto cleanup;
+    }
+
+    if (dump_signals) {
+        le_prefix_model_config_t model_config;
+        le_prefix_model_config_init(&model_config);
+        model_config.strategy = options.prefix_strategy;
+        model_config.fixed_graphemes = options.fixed_graphemes;
+        model_config.proportion = options.prefix_proportion;
+        status = le_generate_prefix_signals(runtime, analysis, &model_config, &signals);
+        if (status != LE_OK) {
+            le_string_view_t detail = le_runtime_last_error(runtime);
+            fprintf(stderr, "Signal generation failed: %s: %.*s\n", le_status_string(status),
+                    (int)detail.size, detail.data == NULL ? "" : detail.data);
+            goto cleanup;
+        }
     }
 
     if (dump_analysis) {
         print_analysis(analysis);
+    } else if (dump_signals) {
+        print_signals(signals);
     } else {
         size_t count = le_result_emphasis_count(result);
         const le_emphasis_t* items = le_result_emphasis_data(result);
@@ -223,6 +287,7 @@ int main(int argc, char** argv) {
     exit_code = 0;
 
 cleanup:
+    le_signal_result_destroy(signals);
     le_analysis_destroy(analysis);
     le_result_destroy(result);
     le_runtime_destroy(runtime);

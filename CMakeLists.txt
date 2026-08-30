@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.2.0 LANGUAGES C CXX)
+project(lae VERSION 0.3.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -72,6 +72,14 @@ if(LAE_BUILD_TESTS)
     target_link_libraries(le-core-ir-tests PRIVATE PkgConfig::UTF8PROC)
     add_test(NAME core-ir COMMAND le-core-ir-tests)
 
+    add_executable(le-core-policy-tests
+        tests/core_policy_tests.cpp
+        runtime/core/emphasis.cpp
+    )
+    target_compile_features(le-core-policy-tests PRIVATE cxx_std_20)
+    target_include_directories(le-core-policy-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+    add_test(NAME core-policy COMMAND le-core-policy-tests)
+
     add_executable(le-c11-abi-test tests/c_abi_test.c)
     set_target_properties(le-c11-abi-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
     target_link_libraries(le-c11-abi-test PRIVATE le::runtime)
@@ -93,6 +101,18 @@ if(LAE_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/mixed.txt)
         set_tests_properties(cli-analysis PROPERTIES
             PASS_REGULAR_EXPRESSION "\"kind\":\"unit\""
+        )
+        add_test(NAME cli-signals
+            COMMAND le-cli --fixed 2 --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/mixed.txt)
+        set_tests_properties(cli-signals PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"fixation_salience\":0.500"
+        )
+        add_test(NAME cli-variable-policy
+            COMMAND le-cli --fixed 2 --policy variable --min-strength 0.2
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/mixed.txt)
+        set_tests_properties(cli-variable-policy PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"strength\":0.600"
         )
     endif()
 endif()

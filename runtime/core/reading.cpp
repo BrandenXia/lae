@@ -29,9 +29,12 @@ std::vector<ReadingSignal> PrefixReadingModel::generate(const Text& text,
             continue;
         }
 
-        signals.push_back(ReadingSignal{
-            TextSpan(graphemes.front()->span.begin(), graphemes[count - 1]->span.end()), 1.0F, 0.0F,
-            0.0F});
+        for (std::size_t index = 0; index < count; ++index) {
+            const auto position =
+                count == 1 ? 0.0F : static_cast<float>(index) / static_cast<float>(count - 1);
+            const auto salience = 1.0F - 0.5F * position;
+            signals.push_back(ReadingSignal{graphemes[index]->span, salience, 0.0F, 0.0F});
+        }
     }
     return signals;
 }

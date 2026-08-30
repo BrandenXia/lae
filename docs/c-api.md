@@ -58,11 +58,11 @@ defaults. On 64-bit targets, an explicit reserved field occupies v2's historical
 tail padding so the v2 and v3 size boundaries remain distinguishable.
 
 `language` is a non-null-terminated borrowed BCP-47-compatible byte view. The
-router selects the English provider for `en` and `en-*`; the generic fallback
-records all other tags as region metadata but does not interpret them. Empty
-language means `und`. This preserves explicit routing information without
-putting language behavior in the core. There is no automatic or mixed-language
-detection in this version.
+router selects English for `en` / `en-*` and Chinese for `zh` / `zh-*`; the
+generic fallback records all other tags as region metadata but does not
+interpret them. Empty language means `und`. This preserves explicit routing
+information without putting language behavior in the core. There is no
+automatic or mixed-language detection in this version.
 
 ## Analysis representation
 
@@ -76,10 +76,10 @@ arrays:
 - language regions whose language byte views are analysis-owned.
 
 Node kinds are generic structural categories. Feature IDs are extensible
-32-bit identifiers. ABI 1.3 defines boundary strength, grapheme count, lexical
-core, derivational affix, grammatical affix, and content-unit features. Unknown
-feature IDs must be preserved or ignored rather than treated as errors by
-consumers.
+32-bit identifiers. ABI 1.3 defined boundary strength, grapheme count, lexical
+core, derivational affix, grammatical affix, and content-unit features. ABI 1.4
+adds segmentation confidence plus Han and Latin script features. Unknown feature
+IDs must be preserved or ignored rather than treated as errors by consumers.
 
 Feature namespaces begin at `0x00000000` (core), `0x00010000` (morphology),
 `0x00020000` (syntax), `0x00030000` (semantic), `0x00040000` (script), and
@@ -94,9 +94,9 @@ need to preserve or resupply the input buffer. The signal result owns a
 contiguous `le_reading_signal_t` array.
 
 `le_generate_lexical_core_signals` emits one normalized signal for each
-subunit carrying `LE_FEATURE_LEXICAL_CORE`. The same selection is available to
-high-level processing through `LE_READING_MODEL_LEXICAL_CORE`; older option
-layouts and null options use `LE_READING_MODEL_PREFIX`.
+non-document node carrying `LE_FEATURE_LEXICAL_CORE`. The same selection is
+available to high-level processing through `LE_READING_MODEL_LEXICAL_CORE`;
+older option layouts and null options use `LE_READING_MODEL_PREFIX`.
 
 `le_generate_emphasis` consumes those immutable signals with either
 `LE_POLICY_BINARY` or `LE_POLICY_VARIABLE_STRENGTH`. Binary policy emits the

@@ -13,7 +13,7 @@ _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, pres
                "v1 process options size changed");
 _Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
                "v2 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 3u), "unexpected ABI version");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 4u), "unexpected ABI version");
 
 typedef struct le_process_options_v1_fixture {
     uint32_t struct_size;
@@ -58,8 +58,10 @@ int main(void) {
     le_result_t* result = NULL;
     le_analysis_t* analysis = NULL;
     le_analysis_t* english_analysis = NULL;
+    le_analysis_t* chinese_analysis = NULL;
     le_signal_result_t* signals = NULL;
     le_signal_result_t* lexical_signals = NULL;
+    le_signal_result_t* chinese_signals = NULL;
     le_result_t* staged_result = NULL;
     le_result_t* legacy_result = NULL;
     const char input[] = "hello 世界";
@@ -168,15 +170,46 @@ int main(void) {
         CHECK(signal_data[1].span.begin == 13 && signal_data[1].span.end == 17);
     }
 
+    {
+        const char chinese[] = "中华人民共和国";
+        uint32_t item;
+        int found_lexical_core = 0;
+        int found_han = 0;
+        CHECK(le_analyze(runtime, (le_string_view_t){chinese, sizeof(chinese) - 1},
+                         (le_string_view_t){"zh-Hans", 7}, &chinese_analysis) == LE_OK);
+        CHECK(le_analysis_node_count(chinese_analysis) == 12);
+        nodes = le_analysis_node_data(chinese_analysis);
+        CHECK(nodes[0].child_count == 1 && nodes[1].kind == LE_NODE_SENTENCE);
+        CHECK(nodes[1].child_count == 3 && nodes[2].kind == LE_NODE_UNIT);
+        CHECK(nodes[2].child_count == 2 && nodes[3].kind == LE_NODE_SUBUNIT);
+        for (item = 0; item < nodes[2].feature_count; ++item) {
+            const le_feature_t feature =
+                le_analysis_feature_data(chinese_analysis)[nodes[2].first_feature + item];
+            found_lexical_core |= feature.id == LE_FEATURE_LEXICAL_CORE;
+            found_han |= feature.id == LE_FEATURE_SCRIPT_HAN;
+        }
+        CHECK(found_lexical_core && found_han);
+        CHECK(le_generate_lexical_core_signals(runtime, chinese_analysis, &chinese_signals) ==
+              LE_OK);
+        CHECK(le_signal_result_count(chinese_signals) == 3);
+        signal_data = le_signal_result_data(chinese_signals);
+        CHECK(signal_data[0].span.begin == 0 && signal_data[0].span.end == 6);
+        CHECK(signal_data[1].span.begin == 6 && signal_data[1].span.end == 12);
+        CHECK(signal_data[2].span.begin == 12 && signal_data[2].span.end == 21);
+    }
+
     le_runtime_destroy(runtime);
     CHECK(le_result_emphasis_count(result) == 2);
     CHECK(le_analysis_node_count(analysis) == 3);
     CHECK(le_signal_result_count(signals) == 4);
     CHECK(le_signal_result_count(lexical_signals) == 2);
+    CHECK(le_signal_result_count(chinese_signals) == 3);
     le_result_destroy(staged_result);
     le_signal_result_destroy(lexical_signals);
+    le_signal_result_destroy(chinese_signals);
     le_signal_result_destroy(signals);
     le_analysis_destroy(english_analysis);
+    le_analysis_destroy(chinese_analysis);
     le_analysis_destroy(analysis);
     le_result_destroy(result);
     return 0;

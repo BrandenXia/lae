@@ -2,10 +2,11 @@
 
 LAE is an early language-aware typographic emphasis runtime. The current
 milestone provides a stable C ABI, a validated and inspectable linguistic IR,
-a generic Unicode fallback, a statically linked rule-based English provider,
-prefix and lexical-core reading models, and binary or variable-strength
-presentation. It intentionally has no renderer, training dependency, model
-loader, automatic language detection, or dynamic plugin system yet.
+a generic Unicode fallback, statically linked rule-based English and Chinese
+providers, prefix and lexical-core reading models, and binary or
+variable-strength presentation. It intentionally has no renderer, training
+dependency, model loader, automatic language detection, or dynamic plugin
+system yet.
 
 ## Build and test
 
@@ -27,6 +28,8 @@ printf 'progressive emphasis' | build/le-cli --fixed 3 --dump-signals
 printf 'progressive emphasis' | build/le-cli --fixed 3 --policy variable --min-strength 0.2
 printf 'unbelievable reading' | build/le-cli --language en --model lexical-core
 printf 'unbelievable reading' | build/le-cli --language en --dump-analysis
+printf '中华人民共和国' | build/le-cli --language zh-Hans --model lexical-core
+printf '研究生命起源' | build/le-cli --language zh-Hans --dump-analysis
 ```
 
 The CLI prints ordered, non-overlapping UTF-8 byte ranges or the provider's
@@ -35,7 +38,7 @@ nodes, features, and language regions as JSON.
 ## Current architecture
 
 ```text
-UTF-8 → language router → generic or English provider → linguistic IR
+UTF-8 → language router → generic, English, or Chinese provider → linguistic IR
       → prefix or lexical-core reading model → reading signals
       → binary/variable presentation policy → emphasis spans
 ```
@@ -45,5 +48,6 @@ until `le_result_destroy`. Rendering stays in the host application.
 
 See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [English provider](docs/english-provider.md),
+[Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and
 [text and offsets](docs/text-and-offsets.md) for the contracts.

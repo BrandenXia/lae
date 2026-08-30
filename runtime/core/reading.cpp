@@ -42,7 +42,7 @@ std::vector<ReadingSignal> PrefixReadingModel::generate(const Text& text,
 std::vector<ReadingSignal> LexicalCoreReadingModel::generate(const Analysis& analysis) const {
     std::vector<ReadingSignal> signals;
     for (const auto& node : analysis.nodes) {
-        if (node.kind != NodeKind::subunit) {
+        if (node.kind == NodeKind::document) {
             continue;
         }
         const auto lexical_core = std::ranges::any_of(node.features, [](const Feature& feature) {

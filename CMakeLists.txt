@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.4.0 LANGUAGES C CXX)
+project(lae VERSION 0.5.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -16,6 +16,7 @@ add_library(le_runtime
     runtime/core/pipeline.cpp
     runtime/core/reading.cpp
     runtime/core/text.cpp
+    runtime/providers/chinese/chinese_provider.cpp
     runtime/providers/english/english_provider.cpp
     runtime/providers/generic/generic_provider.cpp
 )
@@ -96,6 +97,17 @@ if(LAE_BUILD_TESTS)
     target_link_libraries(le-core-english-tests PRIVATE PkgConfig::UTF8PROC)
     add_test(NAME core-english COMMAND le-core-english-tests)
 
+    add_executable(le-core-chinese-tests
+        tests/core_chinese_tests.cpp
+        runtime/core/ir.cpp
+        runtime/core/text.cpp
+        runtime/providers/chinese/chinese_provider.cpp
+    )
+    target_compile_features(le-core-chinese-tests PRIVATE cxx_std_20)
+    target_include_directories(le-core-chinese-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+    target_link_libraries(le-core-chinese-tests PRIVATE PkgConfig::UTF8PROC)
+    add_test(NAME core-chinese COMMAND le-core-chinese-tests)
+
     add_executable(le-c11-abi-test tests/c_abi_test.c)
     set_target_properties(le-c11-abi-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
     target_link_libraries(le-c11-abi-test PRIVATE le::runtime)
@@ -135,6 +147,12 @@ if(LAE_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt)
         set_tests_properties(cli-english-lexical-core PROPERTIES
             PASS_REGULAR_EXPRESSION "\"lexical_salience\":1.000"
+        )
+        add_test(NAME cli-chinese-lexical-core
+            COMMAND le-cli --language zh-Hans --model lexical-core --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/chinese.txt)
+        set_tests_properties(cli-chinese-lexical-core PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"begin\":12,\"end\":21"
         )
     endif()
 endif()

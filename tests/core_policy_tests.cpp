@@ -56,7 +56,7 @@ int main() {
              {}},
             {NodeId(1),
              TextSpan(ByteOffset(0), ByteOffset(4)),
-             NodeKind::subunit,
+             NodeKind::unit,
              {},
              {{feature_lexical_core, 1.0F}}},
             {NodeId(2),
@@ -68,7 +68,7 @@ int main() {
         {},
     };
     const auto lexical = LexicalCoreReadingModel().generate(analysis);
-    check(lexical.size() == 1, "lexical-core model selects only marked subunits");
+    check(lexical.size() == 1, "lexical-core model selects only marked nodes");
     check(lexical[0].span.begin().value() == 0 && lexical[0].span.end().value() == 4,
           "lexical-core model preserves provider span");
     check(near(lexical[0].fixation_salience, 1.0F) && near(lexical[0].lexical_salience, 1.0F),

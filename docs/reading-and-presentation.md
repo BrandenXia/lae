@@ -16,10 +16,11 @@ emits one signal per selected grapheme, declining linearly
 from `1.0` to `0.5` across a multi-grapheme prefix. This is a baseline heuristic,
 not a typography decision or a learned prediction.
 
-The lexical-core model selects subunit nodes carrying
+The lexical-core model selects non-document nodes carrying
 `LE_FEATURE_LEXICAL_CORE` and emits one whole-span signal with fixation and
-lexical salience set to `1.0`. The model is language-independent: providers are
-responsible for producing the feature, and the generic fallback produces none.
+lexical salience set to `1.0`. It does not require one structural level: English
+marks morphological subunits and Chinese marks segmented units. The model is
+language-independent, and the generic fallback produces no lexical-core facts.
 
 Signal results are immutable and own contiguous output storage. An advanced
 analysis handle owns one immutable snapshot of its source text, exposed as a
@@ -45,6 +46,6 @@ contrast, decoration, or another host-specific presentation.
 
 Dedicated prefix-model and presentation configurations are independently
 versioned with `struct_size`. High-level `le_process_options_t` v2 appended the
-policy fields to its v1 layout; v3 appends reading-model selection. ABI 1.3
+policy fields to its v1 layout; v3 appends reading-model selection. ABI 1.4
 accepts all three exact legacy boundaries, defaults older callers to the prefix
 model, and never reads appended fields from a smaller buffer.

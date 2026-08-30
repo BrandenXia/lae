@@ -140,6 +140,18 @@ void contract_tests() {
     expect_spans("English lexical cores", "unbelievable reading", {{2, 8}, {13, 17}},
                  &lexical_core);
 
+    le_process_options_t chinese_lexical_core;
+    le_process_options_init(&chinese_lexical_core);
+    chinese_lexical_core.language = le_string_view_t{"zh-Hans", 7};
+    chinese_lexical_core.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+    expect_spans("Chinese lexical cores", "中华人民共和国", {{0, 21}}, &chinese_lexical_core);
+
+    le_process_options_t chinese_prefix;
+    le_process_options_init(&chinese_prefix);
+    chinese_prefix.language = le_string_view_t{"zh-Hans", 7};
+    expect_spans("Chinese segmented prefix", "中华人民共和国", {{0, 3}, {6, 9}, {12, 18}},
+                 &chinese_prefix);
+
     le_process_options_t legacy_v2;
     le_process_options_init(&legacy_v2);
     legacy_v2.struct_size = LE_PROCESS_OPTIONS_V2_SIZE;
@@ -202,6 +214,10 @@ void contract_tests() {
               LE_ERROR_INVALID_ARGUMENT,
           "signal generation requires analysis");
     check(signals == nullptr, "out_signals cleared on error");
+    signals = reinterpret_cast<le_signal_result_t*>(0x1);
+    check(le_generate_lexical_core_signals(runtime, nullptr, &signals) == LE_ERROR_INVALID_ARGUMENT,
+          "lexical-core generation requires analysis");
+    check(signals == nullptr, "lexical-core out_signals cleared on error");
     check(le_signal_result_count(nullptr) == 0, "null signal count is zero");
     check(le_signal_result_data(nullptr) == nullptr, "null signal data is null");
     le_signal_result_destroy(nullptr);

@@ -27,6 +27,9 @@ if(NOT result EQUAL 0)
     message(FATAL_ERROR "runtime installation failed:\n${output}${error}")
 endif()
 file(RENAME "${stage}" "${prefix}")
+if(NOT EXISTS "${prefix}/share/doc/lae/LICENSE")
+    message(FATAL_ERROR "relocated runtime package does not contain the MIT license")
+endif()
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}"

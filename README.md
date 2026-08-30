@@ -120,3 +120,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [Chinese provider](docs/chinese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and
 [text and offsets](docs/text-and-offsets.md) for the contracts.
+
+## License
+
+LAE is available under the [MIT License](LICENSE).

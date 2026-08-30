@@ -376,6 +376,7 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/leConfigVersion.cmake
     DESTINATION ${LE_INSTALL_CMAKEDIR}
 )
+install(FILES LICENSE README.md CHANGELOG.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 if(LAE_BUILD_CLI)
     if(APPLE)
         set_target_properties(le-cli PROPERTIES

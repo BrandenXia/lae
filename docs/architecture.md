@@ -11,7 +11,7 @@ public C ABI (`include/le`)
         ↓
 ABI facade (`runtime/abi`)
         ↓
-text → provider → IR → reading model → signals → policy
+text → provider → IR → built-in/artifact model → signals → policy
 ```
 
 The core uses abstract nodes such as `document`, `unit`, and `subunit`; it does
@@ -52,10 +52,16 @@ The prefix reading model chooses a fixed count or proportion of graphemes from
 each unit and emits per-grapheme fixation-salience signals. The lexical-core
 model consumes only stable IR feature IDs and emits lexical/fixation signals for
 marked nodes; English marks morphological subunits while Chinese marks lexical
-units. Presentation is a separate
-stage: the binary policy thresholds and merges signals at one strength, while
+units. Presentation is a separate stage: the binary policy thresholds and
+merges signals at one strength, while
 the variable policy interpolates strength from salience. Output spans remain
 ordered and non-overlapping.
+
+The model subsystem parses immutable bytes supplied by the host into an owned
+runtime model. Its format layer has no provider, text, filesystem, or training
+dependency. Loaded prefix artifacts supply strategy parameters; lexical-core
+artifacts declare their required feature ID. Both feed the same reading-signal
+and presentation stages as the compatibility APIs.
 
 ## Runtime properties
 
@@ -63,13 +69,14 @@ ordered and non-overlapping.
 - A long-lived analysis owns one immutable source snapshot for later stages.
 - Results are immutable and own one contiguous emphasis array.
 - Analyses, signals, and results remain valid after their runtime is destroyed.
+- Loaded models own parsed metadata and remain valid after runtime destruction.
 - Processing has no global mutable model or provider state and is deterministic.
 - Diagnostics are thread-local; each thread observes its own most recent error.
 - `utf8proc` supplies standards-based UTF-8 decoding and extended grapheme
   boundary behavior without introducing language-specific rules.
 
 The C ABI exposes immutable flat views of nodes, child identifiers, features,
-and language regions. Dynamic providers, a stable plugin ABI, artifact loading,
-mixed-language routing, and streaming remain deferred. English and Chinese now
+and language regions. Dynamic providers, a stable plugin ABI, mixed-language
+routing, and streaming remain deferred. English and Chinese now
 exercise structurally different uses of the same IR; Japanese remains a future
 third provider.

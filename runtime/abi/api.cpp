@@ -2,6 +2,7 @@
 
 #include "core/pipeline.hpp"
 #include "core/text.hpp"
+#include "model/artifact.hpp"
 
 #include <algorithm>
 #include <array>
@@ -12,6 +13,7 @@
 #include <limits>
 #include <memory>
 #include <new>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -38,6 +40,10 @@ struct le_analysis {
 struct le_signal_result {
     std::vector<le::core::ReadingSignal> core;
     std::vector<le_reading_signal_t> signals;
+};
+
+struct le_model {
+    le::model::Artifact core;
 };
 
 namespace {
@@ -180,6 +186,33 @@ le::core::PresentationConfig presentation_defaults() {
 le::core::PipelineOptions defaults() {
     return le::core::PipelineOptions{"und", prefix_defaults(), presentation_defaults(),
                                      le::core::ReadingModelKind::prefix};
+}
+
+bool model_supports_analysis_languages(const le::model::Artifact& model,
+                                       const le::core::Analysis& analysis) {
+    return std::ranges::all_of(analysis.language_regions,
+                               [&](const le::core::LanguageRegion& region) {
+                                   return le::model::supports_language(model, region.language);
+                               });
+}
+
+std::vector<le::core::ReadingSignal> generate_model_signals(const le::core::Text& text,
+                                                            const le::core::Analysis& analysis,
+                                                            const le::model::Artifact& model) {
+    if (model.type == LE_MODEL_PREFIX) {
+        const auto strategy = model.prefix_strategy == LE_PREFIX_FIXED
+                                  ? le::core::PrefixStrategy::fixed
+                                  : le::core::PrefixStrategy::proportional;
+        return le::core::PrefixReadingModel(le::core::PrefixModelConfig{strategy,
+                                                                        model.fixed_graphemes,
+                                                                        model.prefix_proportion})
+            .generate(text, analysis);
+    }
+    if (model.type == LE_MODEL_LEXICAL_CORE) {
+        return le::core::LexicalCoreReadingModel().generate(analysis);
+    }
+    throw le::model::ArtifactError(le::model::ErrorKind::incompatible,
+                                   "loaded model type is no longer supported");
 }
 
 le_status_t read_prefix_config(const le_prefix_model_config_t* source,
@@ -379,6 +412,84 @@ le_status_t le_runtime_create(const le_runtime_config_t* config, le_runtime_t** 
 
 void le_runtime_destroy(le_runtime_t* runtime) { delete runtime; }
 
+le_status_t le_model_load(le_runtime_t* runtime, const void* data, size_t size,
+                          le_model_t** out_model) {
+    if (out_model == nullptr) {
+        return invalid_argument("out_model is null");
+    }
+    *out_model = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (data == nullptr) {
+        return invalid_argument("model data is null");
+    }
+    try {
+        const auto bytes =
+            std::span<const std::uint8_t>(static_cast<const std::uint8_t*>(data), size);
+        auto model = std::make_unique<le_model>();
+        model->core = le::model::load(bytes);
+        *out_model = model.release();
+        return LE_OK;
+    } catch (const le::model::ArtifactError& error) {
+        set_error(error.what());
+        return error.kind() == le::model::ErrorKind::incompatible ? LE_ERROR_MODEL_INCOMPATIBLE
+                                                                  : LE_ERROR_MODEL_INVALID;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate model");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while loading model");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+void le_model_destroy(le_model_t* model) { delete model; }
+
+le_model_type_t le_model_type(const le_model_t* model) {
+    return model == nullptr ? 0 : model->core.type;
+}
+
+uint32_t le_model_version(const le_model_t* model) {
+    return model == nullptr ? 0 : model->core.model_version;
+}
+
+uint32_t le_model_minimum_abi_version(const le_model_t* model) {
+    return model == nullptr ? 0 : model->core.minimum_abi_version;
+}
+
+size_t le_model_language_count(const le_model_t* model) {
+    return model == nullptr ? 0 : model->core.languages.size();
+}
+
+le_string_view_t le_model_language_at(const le_model_t* model, size_t index) {
+    if (model == nullptr || index >= model->core.languages.size()) {
+        return le_string_view_t{nullptr, 0};
+    }
+    const auto& language = model->core.languages[index];
+    return le_string_view_t{language.data(), language.size()};
+}
+
+int le_model_supports_language(const le_model_t* model, le_string_view_t language) {
+    if (model == nullptr || !valid_language(language)) {
+        return 0;
+    }
+    return le::model::supports_language(model->core, language_view(language)) ? 1 : 0;
+}
+
+size_t le_model_required_feature_count(const le_model_t* model) {
+    return model == nullptr ? 0 : model->core.required_features.size();
+}
+
+const le_feature_id_t* le_model_required_feature_data(const le_model_t* model) {
+    return model == nullptr || model->core.required_features.empty()
+               ? nullptr
+               : model->core.required_features.data();
+}
+
 le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text, le_string_view_t language,
                        le_analysis_t** out_analysis) {
     if (out_analysis == nullptr) {
@@ -537,6 +648,50 @@ le_status_t le_generate_lexical_core_signals(le_runtime_t* runtime, const le_ana
     }
 }
 
+le_status_t le_generate_model_signals(le_runtime_t* runtime, const le_analysis_t* analysis,
+                                      const le_model_t* model, le_signal_result_t** out_signals) {
+    if (out_signals == nullptr) {
+        return invalid_argument("out_signals is null");
+    }
+    *out_signals = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (analysis == nullptr) {
+        return invalid_argument("analysis is null");
+    }
+    if (model == nullptr) {
+        return invalid_argument("model is null");
+    }
+    try {
+        const std::string_view bytes(analysis->text);
+        const le::core::Text core_text(bytes);
+        le::core::validate_analysis(core_text, analysis->core);
+        if (!model_supports_analysis_languages(model->core, analysis->core)) {
+            set_error("model does not support an analysis language");
+            return LE_ERROR_UNSUPPORTED_LANGUAGE;
+        }
+        auto signals = make_signals(generate_model_signals(core_text, analysis->core, model->core));
+        *out_signals = signals.release();
+        return LE_OK;
+    } catch (const le::model::ArtifactError& error) {
+        set_error(error.what());
+        return LE_ERROR_MODEL_INCOMPATIBLE;
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate model reading signals");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while generating model reading signals");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
 size_t le_signal_result_count(const le_signal_result_t* signals) {
     return signals == nullptr ? 0 : signals->signals.size();
 }
@@ -624,6 +779,63 @@ le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
         return LE_ERROR_INTERNAL;
     } catch (...) {
         set_error("unexpected failure while processing text");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+le_status_t le_process_with_model(le_runtime_t* runtime, const le_model_t* model,
+                                  le_string_view_t text, const le_process_options_t* options,
+                                  le_result_t** out_result) {
+    if (out_result == nullptr) {
+        return invalid_argument("out_result is null");
+    }
+    *out_result = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (model == nullptr) {
+        return invalid_argument("model is null");
+    }
+    if (!valid_view(text)) {
+        return invalid_argument("text data is null while text size is nonzero");
+    }
+    if (text.size > std::numeric_limits<std::uint64_t>::max()) {
+        return invalid_argument("text is too large for 64-bit byte offsets");
+    }
+
+    try {
+        le::core::PipelineOptions pipeline_options = defaults();
+        const auto options_status = read_options(options, pipeline_options);
+        if (options_status != LE_OK) {
+            return options_status;
+        }
+        const std::string_view bytes =
+            text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
+        const le::core::Text core_text(bytes);
+        const auto analysis = le::core::analyze(core_text, pipeline_options.language);
+        if (!model_supports_analysis_languages(model->core, analysis)) {
+            set_error("model does not support the requested language");
+            return LE_ERROR_UNSUPPORTED_LANGUAGE;
+        }
+        const auto signals = generate_model_signals(core_text, analysis, model->core);
+        auto result =
+            make_result(le::core::generate_emphasis(signals, pipeline_options.presentation));
+        *out_result = result.release();
+        return LE_OK;
+    } catch (const le::model::ArtifactError& error) {
+        set_error(error.what());
+        return LE_ERROR_MODEL_INCOMPATIBLE;
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate model processing result");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while processing with a model");
         return LE_ERROR_INTERNAL;
     }
 }

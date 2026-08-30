@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.5.0 LANGUAGES C CXX)
+project(lae VERSION 0.6.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -16,6 +16,7 @@ add_library(le_runtime
     runtime/core/pipeline.cpp
     runtime/core/reading.cpp
     runtime/core/text.cpp
+    runtime/model/artifact.cpp
     runtime/providers/chinese/chinese_provider.cpp
     runtime/providers/english/english_provider.cpp
     runtime/providers/generic/generic_provider.cpp
@@ -48,6 +49,13 @@ if(LAE_BUILD_CLI)
     add_executable(le-cli tools/cli/main.c)
     target_compile_features(le-cli PRIVATE c_std_11)
     target_link_libraries(le-cli PRIVATE le::runtime)
+
+    add_executable(le-model tools/model/main.cpp runtime/model/artifact.cpp)
+    target_compile_features(le-model PRIVATE cxx_std_20)
+    target_include_directories(le-model PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/runtime
+    )
 endif()
 
 if(LAE_BUILD_TESTS)
@@ -108,6 +116,17 @@ if(LAE_BUILD_TESTS)
     target_link_libraries(le-core-chinese-tests PRIVATE PkgConfig::UTF8PROC)
     add_test(NAME core-chinese COMMAND le-core-chinese-tests)
 
+    add_executable(le-model-artifact-tests
+        tests/model_artifact_tests.cpp
+        runtime/model/artifact.cpp
+    )
+    target_compile_features(le-model-artifact-tests PRIVATE cxx_std_20)
+    target_include_directories(le-model-artifact-tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/runtime
+    )
+    add_test(NAME model-artifact COMMAND le-model-artifact-tests)
+
     add_executable(le-c11-abi-test tests/c_abi_test.c)
     set_target_properties(le-c11-abi-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
     target_link_libraries(le-c11-abi-test PRIVATE le::runtime)
@@ -154,6 +173,21 @@ if(LAE_BUILD_TESTS)
         set_tests_properties(cli-chinese-lexical-core PROPERTIES
             PASS_REGULAR_EXPRESSION "\"begin\":12,\"end\":21"
         )
+        set(LE_TEST_MODEL ${CMAKE_CURRENT_BINARY_DIR}/test-prefix.lem)
+        add_test(NAME model-cli-compile
+            COMMAND le-model compile-prefix ${LE_TEST_MODEL} --fixed 2 --language en)
+        add_test(NAME model-cli-inspect COMMAND le-model inspect ${LE_TEST_MODEL})
+        set_tests_properties(model-cli-inspect PROPERTIES
+            DEPENDS model-cli-compile
+            PASS_REGULAR_EXPRESSION "\"type\":\"prefix\""
+        )
+        add_test(NAME model-cli-signals
+            COMMAND le-cli --artifact ${LE_TEST_MODEL} --language en --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/english.txt)
+        set_tests_properties(model-cli-signals PROPERTIES
+            DEPENDS model-cli-compile
+            PASS_REGULAR_EXPRESSION "\"fixation_salience\":0.500"
+        )
     endif()
 endif()
 
@@ -164,4 +198,16 @@ install(TARGETS le_runtime
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+if(LAE_BUILD_CLI)
+    if(APPLE)
+        set_target_properties(le-cli PROPERTIES
+            INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    elseif(UNIX)
+        set_target_properties(le-cli PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    endif()
+    install(TARGETS le-cli le-model RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

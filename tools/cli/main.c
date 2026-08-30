@@ -7,7 +7,7 @@
 
 static void usage(FILE* stream) {
     fputs("Usage: le-cli [--language TAG] [--dump-analysis | --dump-signals]\n"
-          "              [--model prefix|lexical-core]\n"
+          "              [--model prefix|lexical-core | --artifact MODEL.lem]\n"
           "              [--fixed N | --proportion P] [--policy binary|variable]\n"
           "              [--threshold S] [--min-strength S] [--strength S] [FILE]\n"
           "Reads UTF-8 from FILE or stdin and prints JSON for the selected stage.\n",
@@ -147,10 +147,14 @@ static int read_all(FILE* input, char** data, size_t* size) {
 int main(int argc, char** argv) {
     le_process_options_t options;
     const char* path = NULL;
+    const char* artifact_path = NULL;
     FILE* input = stdin;
     char* text = NULL;
+    char* artifact_data = NULL;
     size_t text_size = 0;
+    size_t artifact_size = 0;
     le_runtime_t* runtime = NULL;
+    le_model_t* artifact_model = NULL;
     le_result_t* result = NULL;
     le_analysis_t* analysis = NULL;
     le_signal_result_t* signals = NULL;
@@ -212,6 +216,8 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[index], "--language") == 0 && index + 1 < argc) {
             const char* language = argv[++index];
             options.language = (le_string_view_t){language, strlen(language)};
+        } else if (strcmp(argv[index], "--artifact") == 0 && index + 1 < argc) {
+            artifact_path = argv[++index];
         } else if (strcmp(argv[index], "--dump-analysis") == 0) {
             dump_analysis = 1;
         } else if (strcmp(argv[index], "--dump-signals") == 0) {
@@ -249,9 +255,32 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Runtime creation failed: %s\n", le_status_string(status));
         goto cleanup;
     }
+    if (artifact_path != NULL) {
+        FILE* artifact_input = fopen(artifact_path, "rb");
+        if (artifact_input == NULL) {
+            fprintf(stderr, "Could not open %s: %s\n", artifact_path, strerror(errno));
+            goto cleanup;
+        }
+        if (!read_all(artifact_input, &artifact_data, &artifact_size)) {
+            fclose(artifact_input);
+            fputs("Could not read model artifact.\n", stderr);
+            goto cleanup;
+        }
+        fclose(artifact_input);
+        status = le_model_load(runtime, artifact_data, artifact_size, &artifact_model);
+        if (status != LE_OK) {
+            le_string_view_t detail = le_runtime_last_error(runtime);
+            fprintf(stderr, "Model loading failed: %s: %.*s\n", le_status_string(status),
+                    (int)detail.size, detail.data == NULL ? "" : detail.data);
+            goto cleanup;
+        }
+    }
     if (dump_analysis || dump_signals) {
         status =
             le_analyze(runtime, (le_string_view_t){text, text_size}, options.language, &analysis);
+    } else if (artifact_model != NULL) {
+        status = le_process_with_model(runtime, artifact_model, (le_string_view_t){text, text_size},
+                                       &options, &result);
     } else {
         status = le_process(runtime, (le_string_view_t){text, text_size}, &options, &result);
     }
@@ -264,7 +293,9 @@ int main(int argc, char** argv) {
     }
 
     if (dump_signals) {
-        if (options.reading_model == LE_READING_MODEL_LEXICAL_CORE) {
+        if (artifact_model != NULL) {
+            status = le_generate_model_signals(runtime, analysis, artifact_model, &signals);
+        } else if (options.reading_model == LE_READING_MODEL_LEXICAL_CORE) {
             status = le_generate_lexical_core_signals(runtime, analysis, &signals);
         } else {
             le_prefix_model_config_t model_config;
@@ -305,7 +336,9 @@ cleanup:
     le_signal_result_destroy(signals);
     le_analysis_destroy(analysis);
     le_result_destroy(result);
+    le_model_destroy(artifact_model);
     le_runtime_destroy(runtime);
+    free(artifact_data);
     free(text);
     if (input != stdin) {
         fclose(input);

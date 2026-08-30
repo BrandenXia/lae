@@ -13,6 +13,9 @@ initializer. This runtime accepts larger structures and ignores appended bytes,
 but rejects structures smaller than the v1 size. Existing fields must never be
 reordered or reinterpreted within ABI major version 1.
 
+ABI 1.5 adds the opaque model lifecycle, metadata discovery,
+artifact-driven signal generation, and high-level model processing functions.
+
 ## Function contracts
 
 | Function | Nullability and ownership | Thread safety | Errors / lifetime |
@@ -22,16 +25,21 @@ reordered or reinterpreted within ABI major version 1.
 | `le_prefix_model_config_init` | `config` may be null; otherwise caller-owned | Safe for distinct objects | No failure |
 | `le_presentation_config_init` | `config` may be null; otherwise caller-owned | Safe for distinct objects | No failure |
 | `le_runtime_create` | `config` may be null; `out_runtime` must not be null; caller owns success result | Safe | Returns status; writes null before failure |
-| `le_runtime_destroy` | Null accepted; consumes the handle | Safe for an unshared handle | Existing analyses, signals, and results remain valid |
+| `le_runtime_destroy` | Null accepted; consumes the handle | Safe for an unshared handle | Existing models, analyses, signals, and results remain valid |
+| `le_model_load` | Runtime, bytes, and output required; bytes borrowed during call; caller owns model | Concurrent calls are safe | Fully validates artifact; writes null before failure |
+| `le_model_destroy` | Null accepted; consumes model | Safe for an unshared handle | No failure |
+| `le_model_*` metadata accessors | Null returns zero/empty; model borrowed | Safe | Views last until model destruction |
 | `le_analyze` | Runtime/output required; text and language borrowed during call; caller owns analysis | Concurrent calls are safe | Validates UTF-8 and provider output; writes null before failure |
 | `le_analysis_*_count` | Null returns zero; analysis borrowed | Safe | Analysis must still be alive |
 | `le_analysis_*_data` | Null/empty returns null; arrays and language bytes are borrowed | Safe | Views last until analysis destruction |
 | `le_analysis_destroy` | Null accepted; consumes analysis and nested storage | Safe for an unshared handle | No failure |
 | `le_generate_prefix_signals` | Runtime, analysis, and output required; config may be null | Concurrent calls are safe | Caller owns signal result; writes null before failure |
 | `le_generate_lexical_core_signals` | Runtime, analysis, and output required | Concurrent calls are safe | Caller owns signal result; writes null before failure |
+| `le_generate_model_signals` | Runtime, analysis, model, and output required | Concurrent calls are safe | Checks model language metadata; caller owns result |
 | `le_signal_result_*` | Null counts as empty; returned array is borrowed | Safe | Views last until signal-result destruction |
 | `le_generate_emphasis` | Runtime, signals, and output required; config may be null | Concurrent calls are safe | Caller owns result; writes null before failure |
 | `le_process` | Runtime and output pointer required; text/options borrowed only during call; caller owns result | Concurrent calls are safe | Returns status; writes null before failure |
+| `le_process_with_model` | Runtime, model, and output required; text/options borrowed during call | Concurrent calls are safe | Uses model parameters and option presentation fields |
 | `le_runtime_last_error` | Runtime required for a nonempty answer; returned bytes are borrowed | Thread-local | View lasts until the same thread records another error |
 | `le_status_string` | No owned inputs or output | Safe | Returned null-terminated string is static |
 | `le_result_emphasis_count` | Null returns zero; result borrowed | Safe | Result must still be alive |
@@ -41,6 +49,19 @@ reordered or reinterpreted within ABI major version 1.
 Destroying or using the same handle concurrently is not supported. A caller may
 process concurrently through one runtime because the current runtime and its
 provider/model objects have no mutable processing state.
+
+## Model lifecycle and metadata
+
+`le_model_load` accepts `.lem` bytes from memory and never performs filesystem
+access. The loader checks integrity, format and ABI compatibility, model type,
+language tags, required feature IDs, and parameters before returning an
+immutable handle. It owns parsed strings and arrays, so input bytes may be
+released immediately and the model may outlive its loading runtime.
+
+Model accessors expose type, producer-defined model version, minimum ABI,
+supported languages, and required feature identifiers. Zero languages means
+unrestricted. `le_model_supports_language` matches tags case-insensitively and
+treats a primary capability such as `en` as supporting `en-US`.
 
 ## Processing options
 
@@ -98,6 +119,13 @@ non-document node carrying `LE_FEATURE_LEXICAL_CORE`. The same selection is
 available to high-level processing through `LE_READING_MODEL_LEXICAL_CORE`;
 older option layouts and null options use `LE_READING_MODEL_PREFIX`.
 
+`le_generate_model_signals` selects the reading implementation and parameters
+from a loaded artifact. `le_process_with_model` performs routed analysis,
+artifact-driven signal generation, and the presentation policy in one call.
+Its process-option prefix/model-selector fields are compatibility fields; the
+artifact selects the reading model, while language and presentation fields
+remain active.
+
 `le_generate_emphasis` consumes those immutable signals with either
 `LE_POLICY_BINARY` or `LE_POLICY_VARIABLE_STRENGTH`. Binary policy emits the
 configured maximum strength for signals meeting the threshold and merges
@@ -110,7 +138,11 @@ high-level processing.
 No exception crosses the ABI. Statuses are stable signed 32-bit values.
 Invalid UTF-8 returns `LE_ERROR_INVALID_UTF8`; invalid pointers, structure sizes,
 flags, strategies, or normalized values return `LE_ERROR_INVALID_ARGUMENT`.
-Allocation failures return `LE_ERROR_OUT_OF_MEMORY`. Use
+Malformed artifacts return `LE_ERROR_MODEL_INVALID`; valid artifacts requiring
+unsupported ABI, format, features, flags, or model types return
+`LE_ERROR_MODEL_INCOMPATIBLE`. Language capability mismatches return
+`LE_ERROR_UNSUPPORTED_LANGUAGE`. Allocation failures return
+`LE_ERROR_OUT_OF_MEMORY`. Use
 `le_runtime_last_error` for a thread-local diagnostic intended for humans. The
 diagnostic uses fixed thread-local storage so reporting an allocation failure
 cannot itself allocate; messages longer than 511 bytes are truncated.

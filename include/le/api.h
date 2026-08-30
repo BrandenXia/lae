@@ -2,6 +2,7 @@
 #define LE_API_H
 
 #include "le/analysis.h"
+#include "le/model.h"
 #include "le/presentation.h"
 #include "le/reading.h"
 #include "le/types.h"
@@ -73,8 +74,22 @@ LE_API void le_presentation_config_init(le_presentation_config_t* config);
 /* Create a runtime. config may be NULL. out_runtime must be non-NULL. */
 LE_API le_status_t le_runtime_create(const le_runtime_config_t* config, le_runtime_t** out_runtime);
 
-/* Destroy a runtime. NULL is accepted. Existing analyses, signals, and results remain valid. */
+/* Destroy a runtime. NULL is accepted. Existing models, analyses, signals, and results remain
+ * valid. */
 LE_API void le_runtime_destroy(le_runtime_t* runtime);
+
+/* Load and validate an owned model handle from bytes borrowed for this call. */
+LE_API le_status_t le_model_load(le_runtime_t* runtime, const void* data, size_t size,
+                                 le_model_t** out_model);
+LE_API void le_model_destroy(le_model_t* model);
+LE_API le_model_type_t le_model_type(const le_model_t* model);
+LE_API uint32_t le_model_version(const le_model_t* model);
+LE_API uint32_t le_model_minimum_abi_version(const le_model_t* model);
+LE_API size_t le_model_language_count(const le_model_t* model);
+LE_API le_string_view_t le_model_language_at(const le_model_t* model, size_t index);
+LE_API int le_model_supports_language(const le_model_t* model, le_string_view_t language);
+LE_API size_t le_model_required_feature_count(const le_model_t* model);
+LE_API const le_feature_id_t* le_model_required_feature_data(const le_model_t* model);
 
 /*
  * Analyze UTF-8 text with the provider selected by language. Text and language
@@ -108,6 +123,9 @@ LE_API le_status_t le_generate_prefix_signals(le_runtime_t* runtime, const le_an
 LE_API le_status_t le_generate_lexical_core_signals(le_runtime_t* runtime,
                                                     const le_analysis_t* analysis,
                                                     le_signal_result_t** out_signals);
+LE_API le_status_t le_generate_model_signals(le_runtime_t* runtime, const le_analysis_t* analysis,
+                                             const le_model_t* model,
+                                             le_signal_result_t** out_signals);
 LE_API size_t le_signal_result_count(const le_signal_result_t* signals);
 LE_API const le_reading_signal_t* le_signal_result_data(const le_signal_result_t* signals);
 LE_API void le_signal_result_destroy(le_signal_result_t* signals);
@@ -123,6 +141,10 @@ LE_API le_status_t le_generate_emphasis(le_runtime_t* runtime, const le_signal_r
  */
 LE_API le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
                               const le_process_options_t* options, le_result_t** out_result);
+/* Process UTF-8 text with an immutable artifact model and routed language analysis. */
+LE_API le_status_t le_process_with_model(le_runtime_t* runtime, const le_model_t* model,
+                                         le_string_view_t text, const le_process_options_t* options,
+                                         le_result_t** out_result);
 
 /* Borrow this thread's diagnostic until its next failing call; it may be truncated. */
 LE_API le_string_view_t le_runtime_last_error(const le_runtime_t* runtime);

@@ -22,6 +22,11 @@ lexical salience set to `1.0`. It does not require one structural level: English
 marks morphological subunits and Chinese marks segmented units. The model is
 language-independent, and the generic fallback produces no lexical-core facts.
 
+The same two models can be loaded from `.lem` artifacts. Prefix artifacts move
+strategy, fixed-count, and proportion parameters out of the runtime call site.
+Lexical-core artifacts declare `LE_FEATURE_LEXICAL_CORE` as a required runtime
+capability. Model language metadata is checked before signal generation.
+
 Signal results are immutable and own contiguous output storage. An advanced
 analysis handle owns one immutable snapshot of its source text, exposed as a
 borrowed view by `le_analysis_text`; signal generation therefore needs only the

@@ -20,7 +20,11 @@ reordered or reinterpreted within ABI major version 1.
 | `le_runtime_config_init` | `config` may be null; otherwise caller-owned | Safe for distinct objects | No failure |
 | `le_process_options_init` | `options` may be null; otherwise caller-owned | Safe for distinct objects | No failure |
 | `le_runtime_create` | `config` may be null; `out_runtime` must not be null; caller owns success result | Safe | Returns status; writes null before failure |
-| `le_runtime_destroy` | Null accepted; consumes the handle | Safe for an unshared handle | Existing results remain valid |
+| `le_runtime_destroy` | Null accepted; consumes the handle | Safe for an unshared handle | Existing results and analyses remain valid |
+| `le_analyze` | Runtime/output required; text and language borrowed during call; caller owns analysis | Concurrent calls are safe | Validates UTF-8 and provider output; writes null before failure |
+| `le_analysis_*_count` | Null returns zero; analysis borrowed | Safe | Analysis must still be alive |
+| `le_analysis_*_data` | Null/empty returns null; arrays and language bytes are borrowed | Safe | Views last until analysis destruction |
+| `le_analysis_destroy` | Null accepted; consumes analysis and nested storage | Safe for an unshared handle | No failure |
 | `le_process` | Runtime and output pointer required; text/options borrowed only during call; caller owns result | Concurrent calls are safe | Returns status; writes null before failure |
 | `le_runtime_last_error` | Runtime required for a nonempty answer; returned bytes are borrowed | Thread-local | View lasts until the same thread records another error |
 | `le_status_string` | No owned inputs or output | Safe | Returned null-terminated string is static |
@@ -43,6 +47,25 @@ Strength must also be finite and normalized to `[0,1]`.
 generic fallback records it as region metadata but does not interpret it.
 Empty language means `und`. This preserves explicit routing information without
 putting language behavior in the core.
+
+## Analysis representation
+
+`le_analyze` runs the generic provider independently of reading and presentation
+stages. An analysis owns four immutable contiguous arrays:
+
+- nodes, with stable node identifiers and UTF-8 byte spans;
+- flattened child identifiers addressed by each node's child range;
+- flattened features addressed by each node's feature range;
+- language regions whose language byte views are analysis-owned.
+
+Node kinds are generic structural categories. Feature IDs are extensible
+32-bit identifiers; v1 defines `LE_FEATURE_BOUNDARY_STRENGTH` and
+`LE_FEATURE_GRAPHEME_COUNT` in the stable core range. Unknown feature IDs must
+be preserved or ignored rather than treated as errors by consumers.
+
+Feature namespaces begin at `0x00000000` (core), `0x00010000` (morphology),
+`0x00020000` (syntax), `0x00030000` (semantic), `0x00040000` (script), and
+`0x80000000` (vendor/plugin-specific).
 
 ## Error handling
 

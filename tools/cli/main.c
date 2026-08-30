@@ -6,9 +6,68 @@
 #include <string.h>
 
 static void usage(FILE* stream) {
-    fputs("Usage: le-cli [--fixed N | --proportion P] [--strength S] [FILE]\n"
-          "Reads UTF-8 from FILE or stdin and prints JSON byte spans.\n",
+    fputs("Usage: le-cli [--language TAG] [--dump-analysis]\n"
+          "              [--fixed N | --proportion P] [--strength S] [FILE]\n"
+          "Reads UTF-8 from FILE or stdin and prints JSON emphasis or analysis.\n",
           stream);
+}
+
+static const char* node_kind_name(le_node_kind_t kind) {
+    switch (kind) {
+    case LE_NODE_DOCUMENT:
+        return "document";
+    case LE_NODE_BLOCK:
+        return "block";
+    case LE_NODE_PARAGRAPH:
+        return "paragraph";
+    case LE_NODE_SENTENCE:
+        return "sentence";
+    case LE_NODE_UNIT:
+        return "unit";
+    case LE_NODE_SUBUNIT:
+        return "subunit";
+    default:
+        return "unknown";
+    }
+}
+
+static void print_analysis(const le_analysis_t* analysis) {
+    size_t node_count = le_analysis_node_count(analysis);
+    const le_analysis_node_t* nodes = le_analysis_node_data(analysis);
+    const le_node_id_t* children = le_analysis_child_data(analysis);
+    const le_feature_t* features = le_analysis_feature_data(analysis);
+    size_t region_count = le_analysis_language_region_count(analysis);
+    const le_language_region_t* regions = le_analysis_language_region_data(analysis);
+    size_t node_index;
+    size_t region_index;
+
+    fputs("{\n  \"nodes\":[\n", stdout);
+    for (node_index = 0; node_index < node_count; ++node_index) {
+        const le_analysis_node_t* node = &nodes[node_index];
+        uint32_t item;
+        printf("    {\"id\":%u,\"kind\":\"%s\",\"begin\":%llu,\"end\":%llu,\"children\":[",
+               node->id, node_kind_name(node->kind), (unsigned long long)node->span.begin,
+               (unsigned long long)node->span.end);
+        for (item = 0; item < node->child_count; ++item) {
+            printf("%s%u", item == 0 ? "" : ",", children[node->first_child + item]);
+        }
+        fputs("],\"features\":[", stdout);
+        for (item = 0; item < node->feature_count; ++item) {
+            const le_feature_t* feature = &features[node->first_feature + item];
+            printf("%s{\"id\":%u,\"value\":%.3f}", item == 0 ? "" : ",", feature->id,
+                   (double)feature->value);
+        }
+        printf("]}%s\n", node_index + 1 == node_count ? "" : ",");
+    }
+    fputs("  ],\n  \"language_regions\":[\n", stdout);
+    for (region_index = 0; region_index < region_count; ++region_index) {
+        const le_language_region_t* region = &regions[region_index];
+        printf("    {\"begin\":%llu,\"end\":%llu,\"language\":\"%.*s\",\"confidence\":%.3f}%s\n",
+               (unsigned long long)region->span.begin, (unsigned long long)region->span.end,
+               (int)region->language.size, region->language.data, (double)region->confidence,
+               region_index + 1 == region_count ? "" : ",");
+    }
+    fputs("  ]\n}\n", stdout);
 }
 
 static int parse_float(const char* text, float* value) {
@@ -75,9 +134,11 @@ int main(int argc, char** argv) {
     size_t text_size = 0;
     le_runtime_t* runtime = NULL;
     le_result_t* result = NULL;
+    le_analysis_t* analysis = NULL;
     le_status_t status;
     int index;
     int exit_code = 1;
+    int dump_analysis = 0;
 
     le_process_options_init(&options);
     for (index = 1; index < argc; ++index) {
@@ -98,6 +159,11 @@ int main(int argc, char** argv) {
                 fputs("Invalid emphasis strength.\n", stderr);
                 return 2;
             }
+        } else if (strcmp(argv[index], "--language") == 0 && index + 1 < argc) {
+            const char* language = argv[++index];
+            options.language = (le_string_view_t){language, strlen(language)};
+        } else if (strcmp(argv[index], "--dump-analysis") == 0) {
+            dump_analysis = 1;
         } else if (strcmp(argv[index], "--help") == 0) {
             usage(stdout);
             return 0;
@@ -126,15 +192,22 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Runtime creation failed: %s\n", le_status_string(status));
         goto cleanup;
     }
-    status = le_process(runtime, (le_string_view_t){text, text_size}, &options, &result);
+    if (dump_analysis) {
+        status =
+            le_analyze(runtime, (le_string_view_t){text, text_size}, options.language, &analysis);
+    } else {
+        status = le_process(runtime, (le_string_view_t){text, text_size}, &options, &result);
+    }
     if (status != LE_OK) {
         le_string_view_t detail = le_runtime_last_error(runtime);
-        fprintf(stderr, "Processing failed: %s: %.*s\n", le_status_string(status), (int)detail.size,
-                detail.data == NULL ? "" : detail.data);
+        fprintf(stderr, "%s failed: %s: %.*s\n", dump_analysis ? "Analysis" : "Processing",
+                le_status_string(status), (int)detail.size, detail.data == NULL ? "" : detail.data);
         goto cleanup;
     }
 
-    {
+    if (dump_analysis) {
+        print_analysis(analysis);
+    } else {
         size_t count = le_result_emphasis_count(result);
         const le_emphasis_t* items = le_result_emphasis_data(result);
         size_t item;
@@ -150,6 +223,7 @@ int main(int argc, char** argv) {
     exit_code = 0;
 
 cleanup:
+    le_analysis_destroy(analysis);
     le_result_destroy(result);
     le_runtime_destroy(runtime);
     free(text);

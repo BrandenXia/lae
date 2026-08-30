@@ -1,8 +1,9 @@
 # LAE
 
 LAE is an early language-aware typographic emphasis runtime. The current
-milestone provides a stable C ABI, Unicode-safe generic analysis, and fixed or
-proportional grapheme-prefix baselines. It intentionally has no
+milestone provides a stable C ABI, a validated and inspectable linguistic IR,
+Unicode-safe generic analysis, and fixed or proportional grapheme-prefix
+baselines. It intentionally has no
 language-specific morphology, renderer, training dependency, model loader, or
 dynamic plugin system yet.
 
@@ -21,9 +22,11 @@ Try the C-ABI-only CLI:
 
 ```sh
 printf 'Reading 世界 👩‍🚀' | build/le-cli --proportion 0.5
+printf '我在研究 structured concurrency' | build/le-cli --language zh-Hans --dump-analysis
 ```
 
-The CLI prints ordered, non-overlapping UTF-8 byte ranges as JSON.
+The CLI prints ordered, non-overlapping UTF-8 byte ranges or the provider's
+nodes, features, and language regions as JSON.
 
 ## Current architecture
 
@@ -37,4 +40,3 @@ until `le_result_destroy`. Rendering stays in the host application.
 
 See [architecture](docs/architecture.md), [C API](docs/c-api.md), and
 [text and offsets](docs/text-and-offsets.md) for the contracts.
-

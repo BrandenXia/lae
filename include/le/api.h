@@ -1,6 +1,7 @@
 #ifndef LE_API_H
 #define LE_API_H
 
+#include "le/analysis.h"
 #include "le/types.h"
 #include "le/version.h"
 
@@ -22,6 +23,7 @@ extern "C" {
 
 typedef struct le_runtime le_runtime_t;
 typedef struct le_result le_result_t;
+typedef struct le_analysis le_analysis_t;
 
 typedef struct le_runtime_config {
     uint32_t struct_size;
@@ -55,8 +57,27 @@ LE_API void le_process_options_init(le_process_options_t* options);
 /* Create a runtime. config may be NULL. out_runtime must be non-NULL. */
 LE_API le_status_t le_runtime_create(const le_runtime_config_t* config, le_runtime_t** out_runtime);
 
-/* Destroy a runtime. NULL is accepted. Existing results remain valid. */
+/* Destroy a runtime. NULL is accepted. Existing results and analyses remain valid. */
 LE_API void le_runtime_destroy(le_runtime_t* runtime);
+
+/*
+ * Analyze UTF-8 text with the generic provider. Text and language are borrowed
+ * only for this call. Empty language means "und". The caller owns out_analysis.
+ */
+LE_API le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text,
+                              le_string_view_t language, le_analysis_t** out_analysis);
+
+/* Analysis accessors return immutable arrays borrowed until analysis destruction. */
+LE_API size_t le_analysis_node_count(const le_analysis_t* analysis);
+LE_API const le_analysis_node_t* le_analysis_node_data(const le_analysis_t* analysis);
+LE_API size_t le_analysis_child_count(const le_analysis_t* analysis);
+LE_API const le_node_id_t* le_analysis_child_data(const le_analysis_t* analysis);
+LE_API size_t le_analysis_feature_count(const le_analysis_t* analysis);
+LE_API const le_feature_t* le_analysis_feature_data(const le_analysis_t* analysis);
+LE_API size_t le_analysis_language_region_count(const le_analysis_t* analysis);
+LE_API const le_language_region_t* le_analysis_language_region_data(const le_analysis_t* analysis);
+/* Destroy an analysis and all nested arrays. NULL is accepted. */
+LE_API void le_analysis_destroy(le_analysis_t* analysis);
 
 /*
  * Process UTF-8 text using generic Unicode analysis. options may be NULL.

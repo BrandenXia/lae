@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.1.0 LANGUAGES C CXX)
+project(lae VERSION 0.2.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -10,7 +10,11 @@ pkg_check_modules(UTF8PROC REQUIRED IMPORTED_TARGET libutf8proc)
 
 add_library(le_runtime
     runtime/abi/api.cpp
+    runtime/core/emphasis.cpp
+    runtime/core/ir.cpp
+    runtime/core/language.cpp
     runtime/core/pipeline.cpp
+    runtime/core/reading.cpp
     runtime/core/text.cpp
 )
 add_library(le::runtime ALIAS le_runtime)
@@ -34,7 +38,7 @@ set_target_properties(le_runtime PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON
     POSITION_INDEPENDENT_CODE ON
     VERSION ${PROJECT_VERSION}
-    SOVERSION 0
+    SOVERSION 1
 )
 
 if(LAE_BUILD_CLI)
@@ -57,6 +61,17 @@ if(LAE_BUILD_TESTS)
     target_link_libraries(le-core-text-tests PRIVATE PkgConfig::UTF8PROC)
     add_test(NAME core-text COMMAND le-core-text-tests)
 
+    add_executable(le-core-ir-tests
+        tests/core_ir_tests.cpp
+        runtime/core/ir.cpp
+        runtime/core/language.cpp
+        runtime/core/text.cpp
+    )
+    target_compile_features(le-core-ir-tests PRIVATE cxx_std_20)
+    target_include_directories(le-core-ir-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+    target_link_libraries(le-core-ir-tests PRIVATE PkgConfig::UTF8PROC)
+    add_test(NAME core-ir COMMAND le-core-ir-tests)
+
     add_executable(le-c11-abi-test tests/c_abi_test.c)
     set_target_properties(le-c11-abi-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
     target_link_libraries(le-c11-abi-test PRIVATE le::runtime)
@@ -71,6 +86,15 @@ if(LAE_BUILD_TESTS)
     target_compile_features(le-cpp-abi-test PRIVATE cxx_std_20)
     target_link_libraries(le-cpp-abi-test PRIVATE le::runtime)
     add_test(NAME cpp-abi COMMAND le-cpp-abi-test)
+
+    if(LAE_BUILD_CLI)
+        add_test(NAME cli-analysis
+            COMMAND le-cli --language zh-Hans --dump-analysis
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/mixed.txt)
+        set_tests_properties(cli-analysis PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"kind\":\"unit\""
+        )
+    endif()
 endif()
 
 include(GNUInstallDirs)

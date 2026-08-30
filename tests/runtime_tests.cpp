@@ -129,6 +129,26 @@ void contract_tests() {
     const auto detail = le_runtime_last_error(runtime);
     check(detail.data != nullptr && detail.size != 0, "detailed diagnostic available");
 
+    le_analysis_t* analysis = reinterpret_cast<le_analysis_t*>(0x1);
+    check(le_analyze(runtime, le_string_view_t{"x", 1}, le_string_view_t{"en_US", 5}, &analysis) ==
+              LE_ERROR_INVALID_ARGUMENT,
+          "invalid language tag rejected");
+    check(analysis == nullptr, "out_analysis cleared on error");
+    check(le_analyze(runtime, le_string_view_t{invalid.data(), invalid.size()},
+                     le_string_view_t{nullptr, 0}, &analysis) == LE_ERROR_INVALID_UTF8,
+          "analysis rejects invalid UTF-8");
+
+    check(le_analysis_node_count(nullptr) == 0, "null analysis node count is zero");
+    check(le_analysis_node_data(nullptr) == nullptr, "null analysis node data is null");
+    check(le_analysis_child_count(nullptr) == 0, "null analysis child count is zero");
+    check(le_analysis_child_data(nullptr) == nullptr, "null analysis child data is null");
+    check(le_analysis_feature_count(nullptr) == 0, "null analysis feature count is zero");
+    check(le_analysis_feature_data(nullptr) == nullptr, "null analysis feature data is null");
+    check(le_analysis_language_region_count(nullptr) == 0, "null analysis region count is zero");
+    check(le_analysis_language_region_data(nullptr) == nullptr,
+          "null analysis region data is null");
+    le_analysis_destroy(nullptr);
+
     check(le_result_emphasis_count(nullptr) == 0, "null result count is zero");
     check(le_result_emphasis_data(nullptr) == nullptr, "null result data is null");
     le_result_destroy(nullptr);

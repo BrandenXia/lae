@@ -13,6 +13,10 @@ Provider output must obey these invariants:
 - emitted facts use extensible numeric feature identifiers;
 - output is deterministic for identical inputs and provider configuration.
 
+The core enforces these rules after every provider call. Providers may build
+their analysis however they prefer, but invalid graphs never reach reading
+models or the public analysis handle.
+
 The generic provider is always available as fallback and makes no morphology
 claims. External NLP libraries must be wrapped inside concrete providers; the
 runtime core may not depend on them.
@@ -22,4 +26,3 @@ has been exercised by the generic provider, English, and Chinese or Japanese.
 At that point, the core should validate sink events and own the resulting graph
 and storage. Static provider registration must remain possible for iOS, WASM,
 and embedded builds.
-

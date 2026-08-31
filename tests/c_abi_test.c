@@ -15,8 +15,10 @@ _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, pres
                "v1 process options size changed");
 _Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
                "v2 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 7u), "unexpected ABI version");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 8u), "unexpected ABI version");
 _Static_assert(LE_PROVIDER_ABI_VERSION == (1u << 16u), "unexpected provider ABI version");
+_Static_assert(LE_FEATURE_SCRIPT_HIRAGANA == 0x00040003u, "unexpected hiragana feature");
+_Static_assert(LE_FEATURE_SCRIPT_KATAKANA == 0x00040004u, "unexpected katakana feature");
 
 static const uint8_t lexical_model_fixture[] = {
     0x4c, 0x41, 0x45, 0x4d, 0x4f, 0x44, 0x4c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,

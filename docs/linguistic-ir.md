@@ -10,7 +10,8 @@ The generic provider emits one document root and zero or more unit children. It
 emits generic grapheme-count and boundary-strength features, but no
 language-specific morphology. The English provider additionally emits sentence
 and morphological subunit nodes. The Chinese provider emits segmented lexical
-units containing grapheme-level character subunits.
+units containing grapheme-level character subunits. The Japanese provider emits
+mixed-script morphological units with lexical and grammatical subunits.
 
 The vocabulary intentionally omits a universal `word` node. Future providers
 may represent Chinese segmentations, Japanese mixed-script morphology, Semitic
@@ -28,7 +29,7 @@ single-parent tree, sibling spans overlap, spans split graphemes, features are
 duplicated or non-finite, or language regions overlap or have invalid
 confidence. This ensures downstream models consume one coherent contract.
 
-The stable features defined through ABI 1.4 are:
+The stable features defined through ABI 1.8 are:
 
 | Identifier | Meaning |
 |---|---|
@@ -41,6 +42,8 @@ The stable features defined through ABI 1.4 are:
 | `LE_FEATURE_CONTENT_UNIT` | provider identifies a content-bearing unit |
 | `LE_FEATURE_SCRIPT_HAN` | node is represented in Han script |
 | `LE_FEATURE_SCRIPT_LATIN` | node is represented in Latin script |
+| `LE_FEATURE_SCRIPT_HIRAGANA` | node contains Hiragana script |
+| `LE_FEATURE_SCRIPT_KATAKANA` | node contains Katakana script |
 
 Reading models consume these numeric facts rather than provider classes or
 language tags. Unknown feature IDs remain valid and must be ignored or

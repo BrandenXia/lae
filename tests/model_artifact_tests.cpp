@@ -63,7 +63,7 @@ int main() {
           "artifact header and total sizes are encoded");
     check(read_u32(prefix_bytes, 20) == le::model::checksum(prefix_bytes),
           "artifact stores its CRC-32 checksum");
-    check(read_u32(prefix_bytes, 20) == 0xAFE65754U,
+    check(read_u32(prefix_bytes, 20) == 0x56669F07U,
           "prefix artifact matches the v1 golden checksum");
     const auto loaded_prefix = le::model::load(prefix_bytes);
     check(loaded_prefix.type == LE_MODEL_PREFIX && loaded_prefix.model_version == 7,
@@ -119,6 +119,23 @@ int main() {
               loaded_linear.linear_weights[1].feature == LE_FEATURE_SCRIPT_LATIN &&
               loaded_linear.linear_weights[1].weight == 0.3F,
           "linear salience parameters round trip");
+
+    const le::model::Artifact japanese_linear{
+        LE_ABI_VERSION,
+        LE_MODEL_LINEAR_SALIENCE,
+        1,
+        {"ja"},
+        {LE_FEATURE_SCRIPT_HIRAGANA, LE_FEATURE_SCRIPT_KATAKANA},
+        LE_PREFIX_PROPORTIONAL,
+        1,
+        0.5F,
+        0.0F,
+        {{LE_FEATURE_SCRIPT_HIRAGANA, 0.2F}, {LE_FEATURE_SCRIPT_KATAKANA, 0.3F}},
+    };
+    const auto loaded_japanese_linear = le::model::load(le::model::encode(japanese_linear));
+    check(loaded_japanese_linear.required_features ==
+              std::vector<std::uint32_t>{LE_FEATURE_SCRIPT_HIRAGANA, LE_FEATURE_SCRIPT_KATAKANA},
+          "ABI 1.8 Japanese script features are artifact-compatible");
 
     auto corrupted = prefix_bytes;
     corrupted.back() ^= 0x01U;

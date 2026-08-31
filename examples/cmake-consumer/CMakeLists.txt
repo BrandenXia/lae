@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(le_package_consumer LANGUAGES C CXX)
 
-find_package(le 0.10 CONFIG REQUIRED)
+find_package(le 0.11 CONFIG REQUIRED)
 
 add_executable(le-package-consumer main.c)
 target_compile_features(le-package-consumer PRIVATE c_std_11)

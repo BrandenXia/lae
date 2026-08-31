@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.10.0 LANGUAGES C CXX)
+project(lae VERSION 0.11.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -30,6 +30,7 @@ add_library(le_runtime
     runtime/providers/chinese/chinese_provider.cpp
     runtime/providers/english/english_provider.cpp
     runtime/providers/generic/generic_provider.cpp
+    runtime/providers/japanese/japanese_provider.cpp
 )
 add_library(le::runtime ALIAS le_runtime)
 
@@ -132,6 +133,17 @@ if(LAE_BUILD_TESTS)
     target_link_libraries(le-core-chinese-tests PRIVATE PkgConfig::UTF8PROC)
     add_test(NAME core-chinese COMMAND le-core-chinese-tests)
 
+    add_executable(le-core-japanese-tests
+        tests/core_japanese_tests.cpp
+        runtime/core/ir.cpp
+        runtime/core/text.cpp
+        runtime/providers/japanese/japanese_provider.cpp
+    )
+    target_compile_features(le-core-japanese-tests PRIVATE cxx_std_20)
+    target_include_directories(le-core-japanese-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime)
+    target_link_libraries(le-core-japanese-tests PRIVATE PkgConfig::UTF8PROC)
+    add_test(NAME core-japanese COMMAND le-core-japanese-tests)
+
     add_executable(le-model-artifact-tests
         tests/model_artifact_tests.cpp
         runtime/model/artifact.cpp
@@ -165,6 +177,9 @@ if(LAE_BUILD_TESTS)
                     -DLAE_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}
                     -DLAE_CONFIG=$<CONFIG>
                     -DLAE_CTEST_COMMAND=${CMAKE_CTEST_COMMAND}
+                    "-DLAE_CONSUMER_C_FLAGS=${CMAKE_C_FLAGS}"
+                    "-DLAE_CONSUMER_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
+                    "-DLAE_CONSUMER_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake_package_consumer.cmake
         )
     endif()
@@ -258,6 +273,12 @@ if(LAE_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/chinese.txt)
         set_tests_properties(cli-chinese-lexical-core PROPERTIES
             PASS_REGULAR_EXPRESSION "\"begin\":12,\"end\":21"
+        )
+        add_test(NAME cli-japanese-lexical-core
+            COMMAND le-cli --language ja --model lexical-core --dump-signals
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/japanese.txt)
+        set_tests_properties(cli-japanese-lexical-core PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"begin\":0,\"end\":6"
         )
         set(LE_TEST_MODEL ${CMAKE_CURRENT_BINARY_DIR}/test-prefix.lem)
         add_test(NAME model-cli-compile

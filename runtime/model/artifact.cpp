@@ -110,6 +110,8 @@ bool known_feature(std::uint32_t feature) {
         std::uint32_t(LE_FEATURE_CONTENT_UNIT),
         std::uint32_t(LE_FEATURE_SCRIPT_HAN),
         std::uint32_t(LE_FEATURE_SCRIPT_LATIN),
+        std::uint32_t(LE_FEATURE_SCRIPT_HIRAGANA),
+        std::uint32_t(LE_FEATURE_SCRIPT_KATAKANA),
     };
     return std::ranges::find(known, feature) != known.end();
 }

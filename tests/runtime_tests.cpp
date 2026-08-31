@@ -226,6 +226,13 @@ void contract_tests() {
     expect_spans("Chinese segmented prefix", "中华人民共和国", {{0, 3}, {6, 9}, {12, 18}},
                  &chinese_prefix);
 
+    le_process_options_t japanese_lexical_core;
+    le_process_options_init(&japanese_lexical_core);
+    japanese_lexical_core.language = le_string_view_t{"ja", 2};
+    japanese_lexical_core.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+    expect_spans("Japanese lexical cores", "食べました 日本語を", {{0, 6}, {16, 25}},
+                 &japanese_lexical_core);
+
     le_process_options_t legacy_v2;
     le_process_options_init(&legacy_v2);
     legacy_v2.struct_size = LE_PROCESS_OPTIONS_V2_SIZE;

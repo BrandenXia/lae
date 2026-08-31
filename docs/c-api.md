@@ -19,6 +19,8 @@ ABI 1.6 adds the `LE_MODEL_LINEAR_SALIENCE` model type without changing any
 function signature or public structure layout.
 ABI 1.7 adds provider ABI v1, runtime-local provider discovery and registration,
 and optional dynamic module loading.
+ABI 1.8 adds stable Hiragana and Katakana script feature identifiers and the
+built-in Japanese provider without changing public structure layouts.
 
 ## Function contracts
 
@@ -93,8 +95,8 @@ tail padding so the v2 and v3 size boundaries remain distinguishable.
 
 `language` is a non-null-terminated borrowed BCP-47-compatible byte view. The
 router queries registered external providers first, then selects English for
-`en` / `en-*` and Chinese for `zh` / `zh-*`; the generic fallback records all
-other tags as region metadata but does not interpret them. Empty language means
+`en` / `en-*`, Chinese for `zh` / `zh-*`, and Japanese for `ja` / `ja-*`; the
+generic fallback records all other tags as region metadata but does not interpret them. Empty language means
 `und`. This preserves explicit routing information without putting language
 behavior in the core. There is no automatic or mixed-language detection in this
 version. The complete provider contract is documented in the
@@ -116,6 +118,8 @@ Node kinds are generic structural categories. Feature IDs are extensible
 core, derivational affix, grammatical affix, and content-unit features. ABI 1.4
 adds segmentation confidence plus Han and Latin script features. Unknown feature
 IDs must be preserved or ignored rather than treated as errors by consumers.
+
+ABI 1.8 adds stable Hiragana and Katakana script features.
 
 Feature namespaces begin at `0x00000000` (core), `0x00010000` (morphology),
 `0x00020000` (syntax), `0x00030000` (semantic), `0x00040000` (script), and

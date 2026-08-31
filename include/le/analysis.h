@@ -37,6 +37,8 @@ typedef uint32_t le_feature_id_t;
 #define LE_FEATURE_CONTENT_UNIT ((le_feature_id_t)0x00030001u)
 #define LE_FEATURE_SCRIPT_HAN ((le_feature_id_t)0x00040001u)
 #define LE_FEATURE_SCRIPT_LATIN ((le_feature_id_t)0x00040002u)
+#define LE_FEATURE_SCRIPT_HIRAGANA ((le_feature_id_t)0x00040003u)
+#define LE_FEATURE_SCRIPT_KATAKANA ((le_feature_id_t)0x00040004u)
 
 /*
  * A node in an immutable analysis. Child and feature ranges index the arrays

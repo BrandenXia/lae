@@ -37,6 +37,9 @@ execute_process(
             -B "${consumer_build}"
             "-DCMAKE_PREFIX_PATH=${prefix}"
             "-DCMAKE_BUILD_TYPE=${LAE_CONFIG}"
+            "-DCMAKE_C_FLAGS=${LAE_CONSUMER_C_FLAGS}"
+            "-DCMAKE_CXX_FLAGS=${LAE_CONSUMER_CXX_FLAGS}"
+            "-DCMAKE_EXE_LINKER_FLAGS=${LAE_CONSUMER_EXE_LINKER_FLAGS}"
     RESULT_VARIABLE result
     OUTPUT_VARIABLE output
     ERROR_VARIABLE error

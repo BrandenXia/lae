@@ -36,6 +36,28 @@ class SalienceDatasetTests(unittest.TestCase):
                 }
             )
 
+    def test_japanese_script_features_are_supported(self) -> None:
+        example = parse_salience_record(
+            {
+                "schema_version": 1,
+                "id": "japanese-scripts",
+                "language": "ja",
+                "units": [
+                    {
+                        "features": [
+                            {"id": 0x00040003, "value": 1},
+                            {"id": 0x00040004, "value": 1},
+                        ],
+                        "target_salience": 0.5,
+                    }
+                ],
+            }
+        )
+        self.assertEqual(
+            tuple(feature.feature_id for feature in example.units[0].features),
+            (0x00040003, 0x00040004),
+        )
+
     def test_duplicate_features_are_rejected(self) -> None:
         with self.assertRaises(DatasetError):
             parse_salience_record(

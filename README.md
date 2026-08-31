@@ -2,8 +2,8 @@
 
 LAE is an early language-aware typographic emphasis runtime. The current
 milestone provides a stable C ABI, a validated and inspectable linguistic IR,
-a generic Unicode fallback, statically linked rule-based English and Chinese
-providers, a stable C provider plugin ABI, prefix and lexical-core reading
+a generic Unicode fallback, statically linked rule-based English, Chinese, and
+Japanese providers, a stable C provider plugin ABI, prefix and lexical-core reading
 models, and binary or
 variable-strength presentation. Versioned `.lem` artifacts can now carry model
 parameters and capability metadata into the memory-based runtime loader. An
@@ -37,7 +37,7 @@ cmake --install build --prefix "$PWD/install"
 ```
 
 ```cmake
-find_package(le 0.10 CONFIG REQUIRED)
+find_package(le 0.11 CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE le::runtime)
 ```
 
@@ -110,6 +110,8 @@ printf 'unbelievable reading' | build/le-cli --language en --model lexical-core
 printf 'unbelievable reading' | build/le-cli --language en --dump-analysis
 printf '中华人民共和国' | build/le-cli --language zh-Hans --model lexical-core
 printf '研究生命起源' | build/le-cli --language zh-Hans --dump-analysis
+printf '食べさせられました' | build/le-cli --language ja --model lexical-core
+printf '日本語を研究しています' | build/le-cli --language ja --dump-analysis
 build/le-model compile-prefix build/prefix.lem --fixed 2 --language en
 build/le-model inspect build/prefix.lem
 printf 'artifact driven' | build/le-cli --artifact build/prefix.lem --language en
@@ -151,6 +153,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [Swift binding](docs/swift-binding.md),
 [English provider](docs/english-provider.md),
 [Chinese provider](docs/chinese-provider.md),
+[Japanese provider](docs/japanese-provider.md),
 [reading and presentation](docs/reading-and-presentation.md), and
 [text and offsets](docs/text-and-offsets.md) for the contracts.
 

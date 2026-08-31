@@ -27,10 +27,10 @@ emphasis. Rendering is outside the library.
 
 The language router first queries external providers in deterministic
 registration order, then selects statically linked providers for explicit `en`
-/ `en-*` and `zh` / `zh-*` tags, and otherwise selects the generic provider.
+/ `en-*`, `zh` / `zh-*`, and `ja` / `ja-*` tags, and otherwise selects the generic provider.
 External providers use a stable C sink ABI; they never expose their allocator or
 C++ types to the core. The core owns the resulting storage and provider-neutral
-contract, but contains no English or Chinese analysis rules.
+contract, but contains no English, Chinese, or Japanese analysis rules.
 
 The generic provider groups maximal runs of grapheme clusters separated by
 Unicode separator, control, or punctuation categories. This is only a fallback
@@ -48,6 +48,11 @@ coverage-based segmenter uses a compact built-in lexicon and falls back to
 individual Han characters. Script and segmentation-confidence features make
 the distinction explicit without adding a language-specific node kind.
 
+The Japanese provider groups mixed-script content with following okurigana or
+particles and applies a compact longest-suffix morphology baseline. Lexical,
+grammatical, derivational, Han, Hiragana, Katakana, and Latin facts remain
+ordinary features on generic unit and subunit nodes.
+
 Provider output is validated before it reaches a reading model. Validation
 checks the document root, dense node identifiers, single-parent tree structure,
 ordered non-overlapping siblings, contained grapheme-safe spans, finite unique
@@ -56,8 +61,8 @@ features, and ordered language regions with normalized confidence.
 The prefix reading model chooses a fixed count or proportion of graphemes from
 each unit and emits per-grapheme fixation-salience signals. The lexical-core
 model consumes only stable IR feature IDs and emits lexical/fixation signals for
-marked nodes; English marks morphological subunits while Chinese marks lexical
-units. Presentation is a separate stage: the binary policy thresholds and
+marked nodes; English and Japanese mark morphological subunits while Chinese
+marks lexical units. Presentation is a separate stage: the binary policy thresholds and
 merges signals at one strength, while
 the variable policy interpolates strength from salience. Output spans remain
 ordered and non-overlapping.
@@ -105,8 +110,8 @@ candidate-minus-baseline deltas. No evaluation code is linked into the runtime.
 The C ABI exposes immutable flat views of nodes, child identifiers, features,
 and language regions. Provider ABI v1 supports static registration everywhere
 and optional module loading on supported hosts. Mixed-language routing and
-streaming remain deferred. English and Chinese exercise structurally different
-uses of the same IR; Japanese remains a future third built-in provider.
+streaming remain deferred. English, Chinese, and Japanese exercise structurally
+different uses of the same provider-neutral IR.
 
 The first supported host-language binding lives under `bindings/python`. It is
 a dependency-free wrapper over the shared C ABI, copies immutable emphasis

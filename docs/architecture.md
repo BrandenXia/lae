@@ -36,6 +36,8 @@ Advanced callers can provide a contiguous, grapheme-aligned language-region
 partition. Each slice is routed independently, then its provider-neutral nodes
 are shifted into document coordinates and merged under one validated root.
 Region detection remains outside the runtime.
+The C ABI and both supported host bindings expose high-level region processing
+for built-in or artifact reading models without bypassing the staged pipeline.
 
 The generic provider groups maximal runs of grapheme clusters separated by
 Unicode separator, control, or punctuation categories. This is only a fallback

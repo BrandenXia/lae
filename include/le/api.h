@@ -170,6 +170,21 @@ LE_API le_status_t le_process(le_runtime_t* runtime, le_string_view_t text,
 LE_API le_status_t le_process_with_model(le_runtime_t* runtime, const le_model_t* model,
                                          le_string_view_t text, const le_process_options_t* options,
                                          le_result_t** out_result);
+/*
+ * High-level processing over an explicit language-region partition. When
+ * options is non-NULL, options->language must be empty because regions own
+ * routing. All inputs are borrowed only for this call.
+ */
+LE_API le_status_t le_process_regions(le_runtime_t* runtime, le_string_view_t text,
+                                      const le_language_region_t* regions, size_t region_count,
+                                      const le_process_options_t* options,
+                                      le_result_t** out_result);
+LE_API le_status_t le_process_regions_with_model(le_runtime_t* runtime, const le_model_t* model,
+                                                 le_string_view_t text,
+                                                 const le_language_region_t* regions,
+                                                 size_t region_count,
+                                                 const le_process_options_t* options,
+                                                 le_result_t** out_result);
 
 /* Borrow this thread's diagnostic until its next failing call; it may be truncated. */
 LE_API le_string_view_t le_runtime_last_error(const le_runtime_t* runtime);

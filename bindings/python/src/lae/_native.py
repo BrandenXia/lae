@@ -24,6 +24,15 @@ class CEmphasis(ctypes.Structure):
     ]
 
 
+class CLanguageRegion(ctypes.Structure):
+    _fields_ = [
+        ("span", CTextSpan),
+        ("language", CStringView),
+        ("confidence", ctypes.c_float),
+        ("reserved", ctypes.c_uint32),
+    ]
+
+
 class CProcessOptions(ctypes.Structure):
     _fields_ = [
         ("struct_size", ctypes.c_uint32),
@@ -92,6 +101,8 @@ class NativeLibrary:
             "le_process_options_init",
             "le_process",
             "le_process_with_model",
+            "le_process_regions",
+            "le_process_regions_with_model",
             "le_result_emphasis_count",
             "le_result_emphasis_data",
             "le_result_destroy",
@@ -137,6 +148,26 @@ class NativeLibrary:
             ctypes.POINTER(ctypes.c_void_p),
         ]
         lib.le_process_with_model.restype = ctypes.c_int32
+        region_process_arguments = [
+            ctypes.c_void_p,
+            CStringView,
+            ctypes.POINTER(CLanguageRegion),
+            ctypes.c_size_t,
+            ctypes.POINTER(CProcessOptions),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        lib.le_process_regions.argtypes = region_process_arguments
+        lib.le_process_regions.restype = ctypes.c_int32
+        lib.le_process_regions_with_model.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            CStringView,
+            ctypes.POINTER(CLanguageRegion),
+            ctypes.c_size_t,
+            ctypes.POINTER(CProcessOptions),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        lib.le_process_regions_with_model.restype = ctypes.c_int32
         lib.le_result_emphasis_count.argtypes = [ctypes.c_void_p]
         lib.le_result_emphasis_count.restype = ctypes.c_size_t
         lib.le_result_emphasis_data.argtypes = [ctypes.c_void_p]

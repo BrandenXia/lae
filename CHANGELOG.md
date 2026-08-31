@@ -8,6 +8,23 @@ model artifact format.
 
 No changes yet.
 
+## [0.13.0] - 2026-08-31
+
+### Added
+
+- High-level explicit-region processing through `le_process_regions` and
+  `le_process_regions_with_model`.
+- Mixed-language `LanguageRegion` processing in the Python and Swift bindings.
+
+### Compatibility
+
+- Runtime version: 0.13.0.
+- C ABI: 1.10.
+- Provider ABI: 1.0.
+- Model artifact format: 1.0.
+- Python runtime binding: 0.13.0.
+- Python training package: 0.4.0.
+
 ## [0.12.0] - 2026-08-30
 
 ### Added

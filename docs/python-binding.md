@@ -41,6 +41,28 @@ parameters, binary or variable-strength presentation, salience threshold, and
 emphasis strength. Invalid combinations are validated by the canonical native
 runtime so every binding observes the same contract.
 
+Explicit language regions use the same processing and result types. Region
+spans are UTF-8 byte offsets and must form a contiguous, grapheme-aligned
+partition of the input:
+
+```python
+from lae import LanguageRegion, ProcessOptions, ReadingModel, Runtime, TextSpan
+
+text = "unbelievable 日本語を 研究"
+regions = [
+    LanguageRegion(TextSpan(0, 13), "en"),
+    LanguageRegion(TextSpan(13, 26), "ja"),
+    LanguageRegion(TextSpan(26, 32), "zh-Hans"),
+]
+options = ProcessOptions(reading_model=ReadingModel.LEXICAL_CORE)
+with Runtime("/path/to/lible_runtime.so") as runtime:
+    plan = runtime.process_regions(text, regions, options)
+```
+
+Leave `ProcessOptions.language` empty when supplying regions. The optional
+`model=` argument works the same way as it does for `Runtime.process` and the
+native runtime checks that the artifact supports every region language.
+
 ## Model artifacts
 
 Load compiled `.lem` bytes or a file through the runtime. A model exposes its

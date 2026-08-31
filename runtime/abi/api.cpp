@@ -480,6 +480,18 @@ le_status_t read_options(const le_process_options_t* source, le::core::PipelineO
     return LE_OK;
 }
 
+le_status_t read_region_options(const le_process_options_t* source,
+                                le::core::PipelineOptions& target) {
+    const auto status = read_options(source, target);
+    if (status != LE_OK) {
+        return status;
+    }
+    if (source != nullptr && source->language.size != 0) {
+        return invalid_argument("process options language must be empty when regions are supplied");
+    }
+    return LE_OK;
+}
+
 } // namespace
 
 extern "C" {
@@ -1100,6 +1112,130 @@ le_status_t le_process_with_model(le_runtime_t* runtime, const le_model_t* model
         return LE_ERROR_INTERNAL;
     } catch (...) {
         set_error("unexpected failure while processing with a model");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+le_status_t le_process_regions(le_runtime_t* runtime, le_string_view_t text,
+                               const le_language_region_t* regions, size_t region_count,
+                               const le_process_options_t* options, le_result_t** out_result) {
+    if (out_result == nullptr) {
+        return invalid_argument("out_result is null");
+    }
+    *out_result = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (!valid_view(text)) {
+        return invalid_argument("text data is null while text size is nonzero");
+    }
+    if (text.size > std::numeric_limits<std::uint64_t>::max()) {
+        return invalid_argument("text is too large for 64-bit byte offsets");
+    }
+
+    try {
+        le::core::PipelineOptions pipeline_options = defaults();
+        const auto options_status = read_region_options(options, pipeline_options);
+        if (options_status != LE_OK) {
+            return options_status;
+        }
+        const std::string_view bytes =
+            text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
+        const le::core::Text core_text(bytes);
+        const auto regions_status = validate_explicit_regions(core_text, regions, region_count);
+        if (regions_status != LE_OK) {
+            return regions_status;
+        }
+        const auto analysis = analyze_explicit_regions(*runtime, core_text, regions, region_count);
+        const auto signals =
+            pipeline_options.reading_model == le::core::ReadingModelKind::lexical_core
+                ? le::core::LexicalCoreReadingModel().generate(analysis)
+                : le::core::PrefixReadingModel(pipeline_options.prefix)
+                      .generate(core_text, analysis);
+        auto result =
+            make_result(le::core::generate_emphasis(signals, pipeline_options.presentation));
+        *out_result = result.release();
+        return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate mixed-language processing result");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while processing language regions");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+le_status_t le_process_regions_with_model(le_runtime_t* runtime, const le_model_t* model,
+                                          le_string_view_t text,
+                                          const le_language_region_t* regions, size_t region_count,
+                                          const le_process_options_t* options,
+                                          le_result_t** out_result) {
+    if (out_result == nullptr) {
+        return invalid_argument("out_result is null");
+    }
+    *out_result = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (model == nullptr) {
+        return invalid_argument("model is null");
+    }
+    if (!valid_view(text)) {
+        return invalid_argument("text data is null while text size is nonzero");
+    }
+    if (text.size > std::numeric_limits<std::uint64_t>::max()) {
+        return invalid_argument("text is too large for 64-bit byte offsets");
+    }
+
+    try {
+        le::core::PipelineOptions pipeline_options = defaults();
+        const auto options_status = read_region_options(options, pipeline_options);
+        if (options_status != LE_OK) {
+            return options_status;
+        }
+        const std::string_view bytes =
+            text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
+        const le::core::Text core_text(bytes);
+        const auto regions_status = validate_explicit_regions(core_text, regions, region_count);
+        if (regions_status != LE_OK) {
+            return regions_status;
+        }
+        const auto analysis = analyze_explicit_regions(*runtime, core_text, regions, region_count);
+        if (!model_supports_analysis_languages(model->core, analysis)) {
+            set_error("model does not support every requested language region");
+            return LE_ERROR_UNSUPPORTED_LANGUAGE;
+        }
+        const auto signals = generate_model_signals(core_text, analysis, model->core);
+        auto result =
+            make_result(le::core::generate_emphasis(signals, pipeline_options.presentation));
+        *out_result = result.release();
+        return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
+    } catch (const le::model::ArtifactError& error) {
+        set_error(error.what());
+        return LE_ERROR_MODEL_INCOMPATIBLE;
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate mixed-language model processing result");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while processing language regions with a model");
         return LE_ERROR_INTERNAL;
     }
 }

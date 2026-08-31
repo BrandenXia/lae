@@ -22,6 +22,8 @@ and optional dynamic module loading.
 ABI 1.8 adds stable Hiragana and Katakana script feature identifiers and the
 built-in Japanese provider without changing public structure layouts.
 ABI 1.9 adds `le_analyze_regions` for explicit mixed-language provider routing.
+ABI 1.10 adds `le_process_regions` and `le_process_regions_with_model` for
+high-level explicit-region processing.
 
 ## Function contracts
 
@@ -52,6 +54,8 @@ ABI 1.9 adds `le_analyze_regions` for explicit mixed-language provider routing.
 | `le_generate_emphasis` | Runtime, signals, and output required; config may be null | Concurrent calls are safe | Caller owns result; writes null before failure |
 | `le_process` | Runtime and output pointer required; text/options borrowed only during call; caller owns result | Concurrent calls are safe | Returns status; writes null before failure |
 | `le_process_with_model` | Runtime, model, and output required; text/options borrowed during call | Concurrent calls are safe | Uses model parameters and option presentation fields |
+| `le_process_regions` | Runtime/output required; text, regions, and options borrowed during call | Concurrent calls are safe | Uses explicit routing with configured built-in reading and presentation stages |
+| `le_process_regions_with_model` | Runtime/model/output required; text, regions, and options borrowed during call | Concurrent calls are safe | Checks every region against model language metadata |
 | `le_runtime_last_error` | Runtime required for a nonempty answer; returned bytes are borrowed | Thread-local | View lasts until the same thread records another error |
 | `le_status_string` | No owned inputs or output | Safe | Returned null-terminated string is static |
 | `le_result_emphasis_count` | Null returns zero; result borrowed | Safe | Result must still be alive |
@@ -158,6 +162,12 @@ configured maximum strength for signals meeting the threshold and merges
 adjacent equal spans. Variable policy maps salience linearly between configured
 minimum and maximum strengths. Both return the same `le_result_t` plan used by
 high-level processing.
+
+`le_process_regions` and `le_process_regions_with_model` provide the same
+high-level pipeline over an explicit partition. `options->language` must be
+empty because the region array is the routing authority. The former uses the
+configured built-in reading model; the latter uses its artifact model and
+rejects the request unless that model supports every region language.
 
 ## Error handling
 

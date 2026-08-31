@@ -45,6 +45,26 @@ for the supplied string. This avoids treating Swift's native string indices,
 UTF-16 offsets, Unicode-scalar positions, and UTF-8 byte offsets as
 interchangeable.
 
+Use the region overload for explicitly partitioned mixed-language text:
+
+```swift
+let text = "unbelievable 日本語を 研究"
+let regions = [
+    LanguageRegion(span: TextSpan(begin: 0, end: 13), language: "en"),
+    LanguageRegion(span: TextSpan(begin: 13, end: 26), language: "ja"),
+    LanguageRegion(span: TextSpan(begin: 26, end: 32), language: "zh-Hans"),
+]
+let plan = try runtime.process(
+    text,
+    regions: regions,
+    options: ProcessOptions(readingModel: .lexicalCore)
+)
+```
+
+Region spans use the same UTF-8 coordinates and must cover the text exactly.
+Leave `ProcessOptions.language` empty; an optional artifact `model` must support
+every region language.
+
 ## Artifact models and ownership
 
 Load `.lem` bytes or a file through `Runtime`:

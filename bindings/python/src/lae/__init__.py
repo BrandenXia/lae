@@ -3,6 +3,7 @@
 from .runtime import (
     Emphasis,
     LaeError,
+    LanguageRegion,
     Model,
     ModelType,
     PrefixStrategy,
@@ -13,11 +14,12 @@ from .runtime import (
     TextSpan,
 )
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 
 __all__ = [
     "Emphasis",
     "LaeError",
+    "LanguageRegion",
     "Model",
     "ModelType",
     "PrefixStrategy",

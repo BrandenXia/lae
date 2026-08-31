@@ -37,7 +37,7 @@ cmake --install build --prefix "$PWD/install"
 ```
 
 ```cmake
-find_package(le 0.12 CONFIG REQUIRED)
+find_package(le 0.13 CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE le::runtime)
 ```
 

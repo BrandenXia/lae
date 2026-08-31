@@ -15,7 +15,7 @@ _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, pres
                "v1 process options size changed");
 _Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
                "v2 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 9u), "unexpected ABI version");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 10u), "unexpected ABI version");
 _Static_assert(LE_PROVIDER_ABI_VERSION == (1u << 16u), "unexpected provider ABI version");
 _Static_assert(LE_FEATURE_SCRIPT_HIRAGANA == 0x00040003u, "unexpected hiragana feature");
 _Static_assert(LE_FEATURE_SCRIPT_KATAKANA == 0x00040004u, "unexpected katakana feature");
@@ -84,6 +84,7 @@ int main(void) {
     le_result_t* staged_result = NULL;
     le_result_t* legacy_result = NULL;
     le_result_t* model_result = NULL;
+    le_result_t* mixed_result = NULL;
     const char input[] = "hello 世界";
     const le_emphasis_t* data;
     const le_analysis_node_t* nodes;
@@ -196,6 +197,27 @@ int main(void) {
         CHECK(le_analyze_regions(runtime, (le_string_view_t){input, sizeof(input) - 1},
                                  mixed_regions, 2, &mixed_analysis) == LE_OK);
         CHECK(le_analysis_language_region_count(mixed_analysis) == 2);
+        options.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+        CHECK(le_process_regions(runtime, (le_string_view_t){input, sizeof(input) - 1},
+                                 mixed_regions, 2, &options, &mixed_result) == LE_OK);
+        CHECK(le_result_emphasis_count(mixed_result) == 2);
+        le_result_destroy(mixed_result);
+        mixed_result = NULL;
+        CHECK(le_process_regions_with_model(runtime, model,
+                                            (le_string_view_t){input, sizeof(input) - 1},
+                                            mixed_regions, 2, &options, &mixed_result) == LE_OK);
+        CHECK(le_result_emphasis_count(mixed_result) == 2);
+        le_result_destroy(mixed_result);
+        mixed_result = NULL;
+        {
+            const le_language_region_t unsupported_region = {
+                {0, sizeof(input) - 1}, {"ja", 2}, 1.0F, 0};
+            CHECK(le_process_regions_with_model(runtime, model,
+                                                (le_string_view_t){input, sizeof(input) - 1},
+                                                &unsupported_region, 1, &options,
+                                                &mixed_result) == LE_ERROR_UNSUPPORTED_LANGUAGE);
+            CHECK(mixed_result == NULL);
+        }
     }
 
     model_config.strategy = LE_PREFIX_FIXED;
@@ -298,6 +320,7 @@ int main(void) {
     le_analysis_destroy(analysis);
     le_result_destroy(result);
     le_result_destroy(model_result);
+    le_result_destroy(mixed_result);
     le_model_destroy(model);
     CHECK(le_model_type(NULL) == 0);
     CHECK(le_model_language_count(NULL) == 0);

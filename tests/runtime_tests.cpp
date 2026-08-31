@@ -311,6 +311,26 @@ void contract_tests() {
         le_analysis_destroy(analysis);
         analysis = nullptr;
 
+        le_process_options_t region_options;
+        le_process_options_init(&region_options);
+        region_options.reading_model = LE_READING_MODEL_LEXICAL_CORE;
+        le_result_t* region_result = nullptr;
+        check(le_process_regions(runtime, le_string_view_t{mixed.data(), mixed.size()}, regions, 3,
+                                 &region_options, &region_result) == LE_OK,
+              "high-level region processing uses configured reading model");
+        check(le_result_emphasis_count(region_result) == 3,
+              "high-level region processing returns each lexical core");
+        check(le_result_emphasis_data(region_result)[1].span.begin == 13 &&
+                  le_result_emphasis_data(region_result)[1].span.end == 22,
+              "high-level region processing preserves document offsets");
+        le_result_destroy(region_result);
+
+        region_options.language = le_string_view_t{"en", 2};
+        check(le_process_regions(runtime, le_string_view_t{mixed.data(), mixed.size()}, regions, 3,
+                                 &region_options, &region_result) == LE_ERROR_INVALID_ARGUMENT,
+              "region processing rejects a conflicting options language");
+        check(region_result == nullptr, "failed region processing clears output");
+
         const le_language_region_t gap[] = {
             {le_text_span_t{0, 13}, le_string_view_t{"en", 2}, 1.0F, 0},
             {le_text_span_t{14, 32}, le_string_view_t{"ja", 2}, 1.0F, 0},
@@ -338,6 +358,12 @@ void contract_tests() {
               "empty mixed-language analysis contains only its document root");
         le_analysis_destroy(analysis);
         analysis = nullptr;
+        check(le_process_regions(runtime, le_string_view_t{nullptr, 0}, nullptr, 0, nullptr,
+                                 &region_result) == LE_OK,
+              "empty region processing accepts an empty partition");
+        check(le_result_emphasis_count(region_result) == 0,
+              "empty region processing returns an empty plan");
+        le_result_destroy(region_result);
     }
 
     check(le_analysis_node_count(nullptr) == 0, "null analysis node count is zero");

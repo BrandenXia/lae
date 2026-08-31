@@ -26,6 +26,9 @@ let options = ProcessOptions(language: "en", readingModel: .lexicalCore)
 let plan = try runtime.process("unbelievable reading", options: options)
 ```
 
+The `regions:` overload accepts explicit `LanguageRegion` values for
+high-level mixed-language processing through the same `[Emphasis]` result.
+
 `Runtime` and `Model` close idempotently and also release their native handles
 on deinitialization. A model may outlive the runtime that loaded it, matching the
 C ABI. Both types are sendable for concurrent immutable operations. Do not call

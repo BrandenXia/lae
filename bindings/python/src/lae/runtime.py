@@ -9,7 +9,14 @@ import os
 from pathlib import Path
 from typing import Final
 
-from ._native import CProcessOptions, EncodedView, NativeLibrary, decode_view
+from ._native import (
+    CLanguageRegion,
+    CProcessOptions,
+    CTextSpan,
+    EncodedView,
+    NativeLibrary,
+    decode_view,
+)
 
 
 LE_OK: Final = 0
@@ -49,6 +56,15 @@ class Emphasis:
     span: TextSpan
     strength: float
     style_class: int
+
+
+@dataclass(frozen=True)
+class LanguageRegion:
+    """An explicit language assignment over a UTF-8 byte span."""
+
+    span: TextSpan
+    language: str
+    confidence: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -173,6 +189,39 @@ class Runtime:
     def load_model_file(self, path: str | os.PathLike[str]) -> Model:
         return self.load_model(Path(path).read_bytes())
 
+    def _configured_options(
+        self, options: ProcessOptions | None
+    ) -> tuple[CProcessOptions, EncodedView]:
+        configured = options if options is not None else ProcessOptions()
+        native_options = CProcessOptions()
+        self._native.lib.le_process_options_init(ctypes.byref(native_options))
+        language = EncodedView(configured.language, ascii_only=True)
+        native_options.language = language.view
+        native_options.prefix_strategy = int(configured.prefix_strategy)
+        native_options.fixed_graphemes = configured.fixed_graphemes
+        native_options.prefix_proportion = configured.prefix_proportion
+        native_options.emphasis_strength = configured.emphasis_strength
+        native_options.presentation_policy = int(configured.presentation_policy)
+        native_options.minimum_emphasis_strength = configured.minimum_emphasis_strength
+        native_options.salience_threshold = configured.salience_threshold
+        native_options.reading_model = int(configured.reading_model)
+        return native_options, language
+
+    def _copy_result(self, result: ctypes.c_void_p) -> tuple[Emphasis, ...]:
+        try:
+            count = self._native.lib.le_result_emphasis_count(result)
+            data = self._native.lib.le_result_emphasis_data(result)
+            return tuple(
+                Emphasis(
+                    TextSpan(int(data[index].span.begin), int(data[index].span.end)),
+                    float(data[index].strength),
+                    int(data[index].style_class),
+                )
+                for index in range(count)
+            )
+        finally:
+            self._native.lib.le_result_destroy(result)
+
     def process(
         self,
         text: str,
@@ -184,19 +233,7 @@ class Runtime:
         if not isinstance(text, str):
             raise TypeError("text must be str")
         source = EncodedView(text)
-        native_options = CProcessOptions()
-        self._native.lib.le_process_options_init(ctypes.byref(native_options))
-        configured = options if options is not None else ProcessOptions()
-        language = EncodedView(configured.language, ascii_only=True)
-        native_options.language = language.view
-        native_options.prefix_strategy = int(configured.prefix_strategy)
-        native_options.fixed_graphemes = configured.fixed_graphemes
-        native_options.prefix_proportion = configured.prefix_proportion
-        native_options.emphasis_strength = configured.emphasis_strength
-        native_options.presentation_policy = int(configured.presentation_policy)
-        native_options.minimum_emphasis_strength = configured.minimum_emphasis_strength
-        native_options.salience_threshold = configured.salience_threshold
-        native_options.reading_model = int(configured.reading_model)
+        native_options, language = self._configured_options(options)
 
         result = ctypes.c_void_p()
         if model is None:
@@ -214,19 +251,69 @@ class Runtime:
                 ctypes.byref(result),
             )
         _raise_status(self._native, runtime, status)
-        try:
-            count = self._native.lib.le_result_emphasis_count(result)
-            data = self._native.lib.le_result_emphasis_data(result)
-            return tuple(
-                Emphasis(
-                    TextSpan(int(data[index].span.begin), int(data[index].span.end)),
-                    float(data[index].strength),
-                    int(data[index].style_class),
+        return self._copy_result(result)
+
+    def process_regions(
+        self,
+        text: str,
+        regions: tuple[LanguageRegion, ...] | list[LanguageRegion],
+        options: ProcessOptions | None = None,
+        *,
+        model: Model | None = None,
+    ) -> tuple[Emphasis, ...]:
+        runtime = self._open_handle()
+        if not isinstance(text, str):
+            raise TypeError("text must be str")
+        configured = options if options is not None else ProcessOptions()
+        if configured.language:
+            raise ValueError("options.language must be empty when regions are supplied")
+        region_values = tuple(regions)
+        if not all(isinstance(region, LanguageRegion) for region in region_values):
+            raise TypeError("regions must contain LanguageRegion values")
+
+        source = EncodedView(text)
+        native_options, options_language = self._configured_options(configured)
+        encoded_languages = [
+            EncodedView(region.language, ascii_only=True) for region in region_values
+        ]
+        native_regions = (CLanguageRegion * len(region_values))(
+            *(
+                CLanguageRegion(
+                    CTextSpan(region.span.begin, region.span.end),
+                    language.view,
+                    region.confidence,
+                    0,
                 )
-                for index in range(count)
+                for region, language in zip(region_values, encoded_languages, strict=True)
             )
-        finally:
-            self._native.lib.le_result_destroy(result)
+        )
+        region_data = native_regions if region_values else None
+
+        result = ctypes.c_void_p()
+        if model is None:
+            status = self._native.lib.le_process_regions(
+                runtime,
+                source.view,
+                region_data,
+                len(region_values),
+                ctypes.byref(native_options),
+                ctypes.byref(result),
+            )
+        else:
+            if model._native.identity != self._native.identity:
+                raise ValueError("model and runtime were loaded from different shared libraries")
+            status = self._native.lib.le_process_regions_with_model(
+                runtime,
+                model._open_handle(),
+                source.view,
+                region_data,
+                len(region_values),
+                ctypes.byref(native_options),
+                ctypes.byref(result),
+            )
+        _ = options_language, encoded_languages
+        _raise_status(self._native, runtime, status)
+        return self._copy_result(result)
 
     def close(self) -> None:
         if self._handle is not None:

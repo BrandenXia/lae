@@ -7,6 +7,7 @@ import zlib
 
 from lae import (
     LaeError,
+    LanguageRegion,
     ModelType,
     PrefixStrategy,
     ProcessOptions,
@@ -66,6 +67,30 @@ class RuntimeBindingTests(unittest.TestCase):
             [TextSpan(2, 8), TextSpan(13, 17)],
         )
 
+    def test_explicit_regions_use_multiple_language_providers(self) -> None:
+        source = "unbelievable 日本語を 研究"
+        regions = [
+            LanguageRegion(TextSpan(0, 13), "en"),
+            LanguageRegion(TextSpan(13, 26), "ja", 0.9),
+            LanguageRegion(TextSpan(26, 32), "zh-Hans", 0.8),
+        ]
+        options = ProcessOptions(reading_model=ReadingModel.LEXICAL_CORE)
+        with Runtime(self.library) as runtime:
+            plan = runtime.process_regions(source, regions, options)
+        self.assertEqual(
+            [item.span for item in plan],
+            [TextSpan(2, 8), TextSpan(13, 22), TextSpan(26, 32)],
+        )
+
+    def test_explicit_regions_reject_conflicting_language_option(self) -> None:
+        with Runtime(self.library) as runtime:
+            with self.assertRaisesRegex(ValueError, "language must be empty"):
+                runtime.process_regions(
+                    "reading",
+                    [LanguageRegion(TextSpan(0, 7), "en")],
+                    ProcessOptions(language="en"),
+                )
+
     def test_artifact_metadata_and_processing(self) -> None:
         runtime = Runtime(self.library)
         model = runtime.load_model(prefix_artifact())
@@ -80,6 +105,12 @@ class RuntimeBindingTests(unittest.TestCase):
                 "reading", ProcessOptions(language="en"), model=model
             )
             self.assertEqual([item.span for item in plan], [TextSpan(0, 1)])
+            region_plan = runtime.process_regions(
+                "reading",
+                [LanguageRegion(TextSpan(0, 7), "en")],
+                model=model,
+            )
+            self.assertEqual([item.span for item in region_plan], [TextSpan(0, 1)])
             runtime.close()
             self.assertEqual(model.languages, ("en",))
             with Runtime(self.library) as second_runtime:

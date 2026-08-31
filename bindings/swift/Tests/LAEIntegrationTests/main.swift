@@ -53,6 +53,28 @@ private func testLexicalCore() throws {
 }
 
 @MainActor
+private func testExplicitRegions() throws {
+    let runtime = try Runtime()
+    defer { runtime.close() }
+    let source = "unbelievable 日本語を 研究"
+    let regions = [
+        LanguageRegion(span: TextSpan(begin: 0, end: 13), language: "en"),
+        LanguageRegion(span: TextSpan(begin: 13, end: 26), language: "ja", confidence: 0.9),
+        LanguageRegion(span: TextSpan(begin: 26, end: 32), language: "zh-Hans", confidence: 0.8),
+    ]
+    let options = ProcessOptions(readingModel: .lexicalCore)
+    let plan = try runtime.process(source, regions: regions, options: options)
+    check(
+        plan.map(\.span) == [
+            TextSpan(begin: 2, end: 8),
+            TextSpan(begin: 13, end: 22),
+            TextSpan(begin: 26, end: 32),
+        ],
+        "explicit mixed-language routing"
+    )
+}
+
+@MainActor
 private func testExtendedGrapheme() throws {
     let runtime = try Runtime()
     defer { runtime.close() }
@@ -151,6 +173,13 @@ private func testModelLifecycle() throws {
     let options = ProcessOptions(language: "en")
     let plan = try runtime.process("reading", options: options, model: model)
     check(plan.map(\.span) == [TextSpan(begin: 0, end: 1)], "artifact processing")
+    let regionPlan = try runtime.process(
+        "reading",
+        regions: [LanguageRegion(span: TextSpan(begin: 0, end: 7), language: "en")],
+        model: model
+    )
+    check(regionPlan.map(\.span) == [TextSpan(begin: 0, end: 1)],
+          "artifact processing with explicit regions")
 
     runtime.close()
     let survivingLanguages = try model.languages
@@ -182,6 +211,7 @@ private func testClosedRuntime() throws {
 do {
     try testDefaultProcessing()
     try testLexicalCore()
+    try testExplicitRegions()
     try testExtendedGrapheme()
     try testConcurrentProcessing()
     try testNativeDiagnostic()

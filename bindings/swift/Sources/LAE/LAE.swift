@@ -103,6 +103,18 @@ public struct Emphasis: Sendable, Equatable {
     }
 }
 
+public struct LanguageRegion: Sendable, Equatable {
+    public let span: TextSpan
+    public let language: String
+    public let confidence: Float
+
+    public init(span: TextSpan, language: String, confidence: Float = 1) {
+        self.span = span
+        self.language = language
+        self.confidence = confidence
+    }
+}
+
 public struct LAEError: Error, Sendable, Equatable, CustomStringConvertible {
     public let status: Int32
     public let name: String
@@ -292,6 +304,106 @@ public final class Runtime: @unchecked Sendable {
                     )
                 }
                 return le_process(runtime, textView, &nativeOptions, &result)
+            }
+        }
+        guard status == LE_OK, let result else {
+            throw error(status, runtime: runtime)
+        }
+        defer { le_result_destroy(result) }
+
+        let count = le_result_emphasis_count(result)
+        guard count > 0, let data = le_result_emphasis_data(result) else {
+            return []
+        }
+        return (0..<count).map { index in
+            let value = data[index]
+            return Emphasis(
+                span: TextSpan(begin: value.span.begin, end: value.span.end),
+                strength: value.strength,
+                styleClass: value.style_class
+            )
+        }
+    }
+
+    public func process(
+        _ text: String,
+        regions: [LanguageRegion],
+        options: ProcessOptions = ProcessOptions(),
+        model: Model? = nil
+    ) throws -> [Emphasis] {
+        let runtime = try openHandle()
+        guard options.language.isEmpty else {
+            throw LAEError(
+                status: LE_ERROR_INVALID_ARGUMENT,
+                name: "LE_ERROR_INVALID_ARGUMENT",
+                detail: "options.language must be empty when regions are supplied"
+            )
+        }
+
+        var nativeOptions = le_process_options_t()
+        le_process_options_init(&nativeOptions)
+        nativeOptions.prefix_strategy = options.prefixStrategy.rawValue
+        nativeOptions.fixed_graphemes = options.fixedGraphemes
+        nativeOptions.prefix_proportion = options.prefixProportion
+        nativeOptions.emphasis_strength = options.emphasisStrength
+        nativeOptions.presentation_policy = options.presentationPolicy.rawValue
+        nativeOptions.minimum_emphasis_strength = options.minimumEmphasisStrength
+        nativeOptions.salience_threshold = options.salienceThreshold
+        nativeOptions.reading_model = options.readingModel.rawValue
+        let modelHandle = try model?.openHandle()
+
+        let encodedLanguages = regions.map { $0.language.utf8CString }
+        let languageBuffers = encodedLanguages.map { encoded -> UnsafeMutablePointer<CChar> in
+            let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: encoded.count)
+            encoded.withUnsafeBufferPointer { source in
+                buffer.initialize(from: source.baseAddress!, count: source.count)
+            }
+            return buffer
+        }
+        defer {
+            for (buffer, encoded) in zip(languageBuffers, encodedLanguages) {
+                buffer.deinitialize(count: encoded.count)
+                buffer.deallocate()
+            }
+        }
+        let nativeRegions = zip(regions, languageBuffers).map { region, languageBuffer in
+            le_language_region_t(
+                span: le_text_span_t(begin: region.span.begin, end: region.span.end),
+                language: le_string_view_t(
+                    data: UnsafePointer(languageBuffer),
+                    size: region.language.utf8.count
+                ),
+                confidence: region.confidence,
+                reserved: 0
+            )
+        }
+
+        var result: OpaquePointer?
+        let status = text.utf8CString.withUnsafeBufferPointer { textBytes in
+            nativeRegions.withUnsafeBufferPointer { regionBuffer in
+                let textView = le_string_view_t(
+                    data: textBytes.baseAddress,
+                    size: text.utf8.count
+                )
+                if let modelHandle {
+                    return le_process_regions_with_model(
+                        runtime,
+                        modelHandle,
+                        textView,
+                        regionBuffer.baseAddress,
+                        regionBuffer.count,
+                        &nativeOptions,
+                        &result
+                    )
+                }
+                return le_process_regions(
+                    runtime,
+                    textView,
+                    regionBuffer.baseAddress,
+                    regionBuffer.count,
+                    &nativeOptions,
+                    &result
+                )
             }
         }
         guard status == LE_OK, let result else {

@@ -12,7 +12,8 @@ extract features, optimize a deterministic prefix baseline, evaluate it, and
 export the same artifact format. Its strategy-neutral evaluation layer compares
 offline plan density/complexity and paired human-study outcomes. LAE still
 intentionally has no renderer, runtime training dependency, automatic language
-detection, or neural network. A first learned linear salience model consumes
+detection, or neural network. Its first released model predicts English word
+fixation probability from the CC BY 4.0 Provo eye-tracking corpus and consumes
 stable IR features through the same artifact and C processing APIs as
 deterministic models. External providers can be registered statically on every
 target or loaded from modules when the optional desktop capability is enabled.
@@ -37,7 +38,7 @@ cmake --install build --prefix "$PWD/install"
 ```
 
 ```cmake
-find_package(le 0.14 CONFIG REQUIRED)
+find_package(le 0.15 CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE le::runtime)
 ```
 
@@ -67,6 +68,20 @@ python3 examples/markdown_bold.py \
 
 The script implements provider ABI v1 through `ctypes`, registers it with the
 runtime, and converts the resulting byte spans into Markdown `**bold**` syntax.
+
+Run the released real-data model with its recommended binary threshold:
+
+```sh
+printf 'Language-aware emphasis helps readers scan complex documentation.' |
+  build/le-cli --artifact models/lae-provo-fixation-v1.lem \
+  --language en --threshold 0.60
+PYTHONPATH=bindings/python/src python3 examples/provo_markdown.py \
+  'Language-aware emphasis helps readers scan complex documentation.'
+```
+
+The model was selected with passage-grouped five-fold validation over 2,661
+word units from 84 readers. See its [model card](docs/models/provo-fixation-v1.md)
+and [complete deterministic report](models/lae-provo-fixation-v1.json).
 
 Use the dependency-free Python runtime binding against the same shared build:
 
@@ -148,6 +163,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [training/runtime boundary](docs/training-runtime-boundary.md),
 [evaluation framework](docs/evaluation.md),
 [learned model](docs/learned-model.md),
+[Provo fixation v1 model card](docs/models/provo-fixation-v1.md),
 [provider plugin ABI](docs/provider-plugin-abi.md),
 [Python binding](docs/python-binding.md),
 [Swift binding](docs/swift-binding.md),

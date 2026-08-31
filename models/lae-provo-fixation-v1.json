@@ -1,0 +1,313 @@
+{
+  "artifact": {
+    "format": "1.0",
+    "minimum_runtime_abi": "1.11",
+    "sha256": "b730f02132cad6f651d4cad3c5f0dee31713089d95a52aaf151e61b76d781e7c",
+    "size": 100
+  },
+  "data": {
+    "download_url": "https://osf.io/download/a32be/",
+    "excluded_word_count": 25,
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "name": "The Provo Corpus",
+    "paper_doi": "10.3758/s13428-017-0908-4",
+    "participant_count": 84,
+    "passage_count": 55,
+    "project_url": "https://osf.io/sjefs/",
+    "source_file": "Provo_Corpus-Eyetracking_Data.csv",
+    "source_row_count": 230412,
+    "source_sha256": "38aedcb29bc9171009916eb2bcc2375729f104a2a1005c64a563da94b611b9e7",
+    "source_word_count": 2686,
+    "training_unit_count": 2661
+  },
+  "evaluation": {
+    "all_data_fit": {
+      "mean_absolute_error": 0.09103628490035841,
+      "r_squared": 0.7351678867872872,
+      "root_mean_square_error": 0.11695951143032367,
+      "unit_count": 2661
+    },
+    "baseline": {
+      "mean_absolute_error": 0.19766189022312344,
+      "r_squared": -0.000950428258627456,
+      "root_mean_square_error": 0.227382222628422,
+      "unit_count": 2661
+    },
+    "candidates": [
+      {
+        "feature_ids": [
+          2
+        ],
+        "features": "length",
+        "metrics": {
+          "mean_absolute_error": 0.10354369231987967,
+          "r_squared": 0.686483326771601,
+          "root_mean_square_error": 0.1272566667562109,
+          "unit_count": 2661
+        },
+        "ridge": 0.0
+      },
+      {
+        "feature_ids": [
+          2
+        ],
+        "features": "length",
+        "metrics": {
+          "mean_absolute_error": 0.10354370521909982,
+          "r_squared": 0.6864832596643844,
+          "root_mean_square_error": 0.1272566803756464,
+          "unit_count": 2661
+        },
+        "ridge": 0.01
+      },
+      {
+        "feature_ids": [
+          2
+        ],
+        "features": "length",
+        "metrics": {
+          "mean_absolute_error": 0.10354382133168057,
+          "r_squared": 0.6864826573290332,
+          "root_mean_square_error": 0.12725680261977343,
+          "unit_count": 2661
+        },
+        "ridge": 0.1
+      },
+      {
+        "feature_ids": [
+          2
+        ],
+        "features": "length",
+        "metrics": {
+          "mean_absolute_error": 0.10354497620527209,
+          "r_squared": 0.6864766432684594,
+          "root_mean_square_error": 0.12725802316859963,
+          "unit_count": 2661
+        },
+        "ridge": 1.0
+      },
+      {
+        "feature_ids": [
+          2
+        ],
+        "features": "length",
+        "metrics": {
+          "mean_absolute_error": 0.10355651831098267,
+          "r_squared": 0.6864162652926789,
+          "root_mean_square_error": 0.12727027618227071,
+          "unit_count": 2661
+        },
+        "ridge": 10.0
+      },
+      {
+        "feature_ids": [
+          2
+        ],
+        "features": "length",
+        "metrics": {
+          "mean_absolute_error": 0.10367424137803276,
+          "r_squared": 0.685789028598565,
+          "root_mean_square_error": 0.12739749692052105,
+          "unit_count": 2661
+        },
+        "ridge": 100.0
+      },
+      {
+        "feature_ids": [
+          196610
+        ],
+        "features": "function",
+        "metrics": {
+          "mean_absolute_error": 0.12508231337072043,
+          "r_squared": 0.5319034136197001,
+          "root_mean_square_error": 0.15549554808932378,
+          "unit_count": 2661
+        },
+        "ridge": 0.0
+      },
+      {
+        "feature_ids": [
+          196610
+        ],
+        "features": "function",
+        "metrics": {
+          "mean_absolute_error": 0.12508266533155596,
+          "r_squared": 0.5319034348051259,
+          "root_mean_square_error": 0.1554955445705634,
+          "unit_count": 2661
+        },
+        "ridge": 0.01
+      },
+      {
+        "feature_ids": [
+          196610
+        ],
+        "features": "function",
+        "metrics": {
+          "mean_absolute_error": 0.12508583805252638,
+          "r_squared": 0.5319035917193519,
+          "root_mean_square_error": 0.15549551850813645,
+          "unit_count": 2661
+        },
+        "ridge": 0.1
+      },
+      {
+        "feature_ids": [
+          196610
+        ],
+        "features": "function",
+        "metrics": {
+          "mean_absolute_error": 0.12511750261127533,
+          "r_squared": 0.531903427871246,
+          "root_mean_square_error": 0.15549554572223542,
+          "unit_count": 2661
+        },
+        "ridge": 1.0
+      },
+      {
+        "feature_ids": [
+          196610
+        ],
+        "features": "function",
+        "metrics": {
+          "mean_absolute_error": 0.12545872806267583,
+          "r_squared": 0.5317356331617371,
+          "root_mean_square_error": 0.15552341282670798,
+          "unit_count": 2661
+        },
+        "ridge": 10.0
+      },
+      {
+        "feature_ids": [
+          196610
+        ],
+        "features": "function",
+        "metrics": {
+          "mean_absolute_error": 0.12982144026620954,
+          "r_squared": 0.5183779051752115,
+          "root_mean_square_error": 0.1577260486954094,
+          "unit_count": 2661
+        },
+        "ridge": 100.0
+      },
+      {
+        "feature_ids": [
+          2,
+          196610
+        ],
+        "features": "length+function",
+        "metrics": {
+          "mean_absolute_error": 0.09110774675629857,
+          "r_squared": 0.7340072077253283,
+          "root_mean_square_error": 0.11721553030758732,
+          "unit_count": 2661
+        },
+        "ridge": 0.0
+      },
+      {
+        "feature_ids": [
+          2,
+          196610
+        ],
+        "features": "length+function",
+        "metrics": {
+          "mean_absolute_error": 0.09110788686557265,
+          "r_squared": 0.7340074034840833,
+          "root_mean_square_error": 0.11721548717489509,
+          "unit_count": 2661
+        },
+        "ridge": 0.01
+      },
+      {
+        "feature_ids": [
+          2,
+          196610
+        ],
+        "features": "length+function",
+        "metrics": {
+          "mean_absolute_error": 0.09110914973198404,
+          "r_squared": 0.7340091522147771,
+          "root_mean_square_error": 0.11721510186594325,
+          "unit_count": 2661
+        },
+        "ridge": 0.1
+      },
+      {
+        "feature_ids": [
+          2,
+          196610
+        ],
+        "features": "length+function",
+        "metrics": {
+          "mean_absolute_error": 0.09112194384055924,
+          "r_squared": 0.7340260128717085,
+          "root_mean_square_error": 0.11721138678522518,
+          "unit_count": 2661
+        },
+        "ridge": 1.0
+      },
+      {
+        "feature_ids": [
+          2,
+          196610
+        ],
+        "features": "length+function",
+        "metrics": {
+          "mean_absolute_error": 0.09126041304008173,
+          "r_squared": 0.7341366827666156,
+          "root_mean_square_error": 0.11718699883352372,
+          "unit_count": 2661
+        },
+        "ridge": 10.0
+      },
+      {
+        "feature_ids": [
+          2,
+          196610
+        ],
+        "features": "length+function",
+        "metrics": {
+          "mean_absolute_error": 0.09279805664175421,
+          "r_squared": 0.7319811122781064,
+          "root_mean_square_error": 0.11766110501309343,
+          "unit_count": 2661
+        },
+        "ridge": 100.0
+      }
+    ],
+    "protocol": "5-fold passage-grouped cross-validation",
+    "relative_rmse_reduction": 0.48462550203396704,
+    "selected": {
+      "mean_absolute_error": 0.09126041304008173,
+      "r_squared": 0.7341366827666156,
+      "root_mean_square_error": 0.11718699883352372,
+      "unit_count": 2661
+    },
+    "selection_metric": "root_mean_square_error"
+  },
+  "model": {
+    "bias": 0.3567466735839844,
+    "language": "en",
+    "model_version": 1,
+    "name": "lae-provo-fixation-v1",
+    "recommended_binary_threshold": 0.6,
+    "ridge": 10.0,
+    "selection": "length+function",
+    "target": "probability that a reader fixates the word",
+    "type": "linear_unit_salience",
+    "weights": [
+      {
+        "feature": "grapheme_count",
+        "feature_id": 2,
+        "weight": 0.05543681979179382
+      },
+      {
+        "feature": "function_unit",
+        "feature_id": 196610,
+        "weight": -0.1440969854593277
+      }
+    ]
+  },
+  "schema_version": 1
+}

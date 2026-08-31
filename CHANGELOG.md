@@ -8,6 +8,36 @@ model artifact format.
 
 No changes yet.
 
+## [0.15.0] - 2026-08-31
+
+### Added
+
+- First real-data model, `lae-provo-fixation-v1.lem`, trained from fixation
+  observations for 84 readers across 55 English passages in the CC BY 4.0
+  Provo Corpus.
+- Checksum-pinned Provo preprocessing that obtains exact inference features
+  from `le-cli`, performs passage-grouped five-fold candidate selection, and
+  emits a complete deterministic training report.
+- A minimal Python example that renders the released model's output as
+  Markdown bold using a recommended fixation-probability threshold of 0.60.
+- Model card covering attribution, intended use, held-out results,
+  reproduction, and limitations.
+
+### Validated
+
+- The selected length-plus-function model achieves held-out MAE 0.09126, RMSE
+  0.11719, and R² 0.73414 across 2,661 units.
+- Held-out RMSE is 48.46% lower than a passage-fold mean-only baseline.
+
+### Compatibility
+
+- Runtime version: 0.15.0.
+- C ABI: 1.11 (unchanged).
+- Provider ABI: 1.0 (unchanged).
+- Model artifact format: 1.0 (unchanged).
+- Python runtime binding: 0.15.0.
+- Python training package: 0.5.0.
+
 ## [0.14.0] - 2026-08-31
 
 ### Added

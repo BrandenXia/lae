@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.14.0 LANGUAGES C CXX)
+project(lae VERSION 0.15.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -154,6 +154,15 @@ if(LAE_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime
     )
     add_test(NAME model-artifact COMMAND le-model-artifact-tests)
+    if(LAE_BUILD_CLI)
+        add_test(NAME released-provo-model
+            COMMAND le-model inspect
+                    ${CMAKE_CURRENT_SOURCE_DIR}/models/lae-provo-fixation-v1.lem
+        )
+        set_tests_properties(released-provo-model PROPERTIES
+            PASS_REGULAR_EXPRESSION "linear-salience"
+        )
+    endif()
 
     add_executable(le-c11-abi-test tests/c_abi_test.c)
     set_target_properties(le-c11-abi-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
@@ -240,6 +249,18 @@ if(LAE_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/examples/markdown_bold.py
                     --library $<TARGET_FILE:le_runtime>
                     "Provider APIs can produce Markdown emphasis."
+        )
+        add_test(NAME example-provo-markdown
+            COMMAND ${CMAKE_COMMAND} -E env
+                    PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/src
+                    ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/provo_markdown.py
+                    --library $<TARGET_FILE:le_runtime>
+                    --model ${CMAKE_CURRENT_SOURCE_DIR}/models/lae-provo-fixation-v1.lem
+                    "Language-aware emphasis helps readers scan documentation."
+        )
+        set_tests_properties(example-provo-markdown PROPERTIES
+            PASS_REGULAR_EXPRESSION "\\*\\*Language\\*\\*"
         )
     endif()
 
@@ -405,6 +426,16 @@ install(FILES
     DESTINATION ${LE_INSTALL_CMAKEDIR}
 )
 install(FILES LICENSE README.md CHANGELOG.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES
+    models/lae-provo-fixation-v1.lem
+    models/lae-provo-fixation-v1.json
+    models/lae-provo-fixation-v1-NOTICE.txt
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/lae/models
+)
+install(FILES
+    docs/models/provo-fixation-v1.md
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}/models
+)
 if(LAE_BUILD_CLI)
     if(APPLE)
         set_target_properties(le-cli PROPERTIES

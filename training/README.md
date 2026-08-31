@@ -3,16 +3,18 @@
 This package is the offline side of LAE's artifact boundary. It uses only the
 Python standard library and is never linked or imported by the runtime.
 
-Milestone 7 intentionally provides a deterministic baseline rather than a
-neural model:
+The package intentionally uses deterministic, inspectable models rather than a
+neural runtime dependency:
 
 - a versioned JSON Lines dataset interface;
 - validated UTF-8 byte spans and externally supplied grapheme boundaries;
 - language-neutral scalar feature extraction;
 - prefix-candidate evaluation and grid-search optimization;
-- a pure-Python `.lem` v1 artifact exporter.
-- strategy-neutral offline plan metrics and paired human-study comparisons.
-- a deterministic ridge-regression trainer for linear unit salience.
+- a pure-Python `.lem` v1 artifact exporter;
+- strategy-neutral offline plan metrics and paired human-study comparisons;
+- a deterministic ridge-regression trainer for linear unit salience;
+- checksum-pinned Provo eye-tracking preprocessing and passage-grouped
+  cross-validation for the released English fixation model.
 
 Preprocessing owns linguistic-unit and grapheme discovery. Recording those
 boundaries in the dataset prevents training from silently using segmentation
@@ -56,6 +58,9 @@ PYTHONPATH=training/src python3 -m lae_training summarize-plans PLANS.jsonl
 PYTHONPATH=training/src python3 -m lae_training summarize-study STUDY.jsonl
 PYTHONPATH=training/src python3 -m lae_training \
   fit-linear-salience SALIENCE.jsonl learned.lem
+PYTHONPATH=training/src python3 -m lae_training train-provo \
+  Provo_Corpus-Eyetracking_Data.csv provo.lem \
+  --analyzer build/le-cli --report provo.json
 ```
 
 `fit-prefix` emits a JSON report and a runtime-loadable artifact. With no
@@ -76,3 +81,18 @@ are stable numeric IR feature IDs. The trainer fits a bias and sparse feature
 weights, quantizes them to runtime binary32 values, reports MAE/RMSE/`R²`, and
 exports `LE_MODEL_LINEAR_SALIENCE`. See
 [the learned-model contract](../docs/learned-model.md).
+
+## Real-data Provo model
+
+`train-provo` consumes the canonical CC BY 4.0 Provo eye-tracking CSV. It first
+checks the official OSF SHA-256, aggregates each word's non-skip probability,
+and invokes the supplied `le-cli` once to snapshot the exact runtime features.
+Tokens that do not map to exactly one current English unit are excluded.
+
+Candidate length, function-word, and combined models are evaluated across a
+deterministic five-fold passage split and selected by held-out RMSE. Only after
+selection is the final model refit on all compatible units. The JSON report
+records every candidate, source attribution and checksum, held-out metrics,
+binary32 parameters, and artifact checksum. Raw participant records are never
+written to the repository or artifact. See the released
+[model card](../docs/models/provo-fixation-v1.md).

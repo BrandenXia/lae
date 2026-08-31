@@ -45,5 +45,12 @@ IDs, quantizes fitted parameters to binary32, and exports a model artifact. The
 runtime only evaluates the compiled bias and weights; it does not contain the
 solver or dataset code.
 
+Version 0.15 exercises this boundary with the first released real-data model.
+The Provo trainer checks a canonical source checksum, asks a matching runtime
+CLI to produce inference-time features, selects candidates on held-out passage
+folds, and writes only compiled weights plus a provenance report. Raw corpus
+rows, reader identifiers, and stimulus text never enter the artifact or source
+tree.
+
 There is no neural network, framework checkpoint, experiment database, runtime
 Python bridge, online adaptation, or claim of statistical significance.

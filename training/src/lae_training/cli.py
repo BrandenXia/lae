@@ -20,6 +20,7 @@ from .features import extract_features
 from .linear_salience import fit_linear_salience
 from .optimize import fit_prefix
 from .plan_evaluation import PlanJsonlDataset, aggregate_plans, compare_plans
+from .provo import train_provo_model
 from .study_evaluation import StudyJsonlDataset, aggregate_study, compare_study
 from .salience_dataset import SalienceJsonlDataset
 
@@ -114,6 +115,21 @@ def _fit_linear_salience(arguments: argparse.Namespace) -> None:
     print(json.dumps(report, sort_keys=True))
 
 
+def _train_provo(arguments: argparse.Namespace) -> None:
+    result = train_provo_model(
+        arguments.dataset,
+        arguments.analyzer,
+        model_version=arguments.model_version,
+        folds=arguments.folds,
+    )
+    write_artifact(arguments.output, result.artifact)
+    if arguments.report:
+        Path(arguments.report).write_text(
+            json.dumps(result.report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    print(json.dumps(result.report, sort_keys=True))
+
+
 def _summarize_plans(arguments: argparse.Namespace) -> None:
     records = tuple(PlanJsonlDataset(arguments.plans))
     report = {
@@ -170,6 +186,17 @@ def parser() -> argparse.ArgumentParser:
     learned.add_argument("--language", action="append")
     learned.add_argument("--model-version", type=int, default=1)
     learned.set_defaults(handler=_fit_linear_salience)
+
+    provo = commands.add_parser(
+        "train-provo", help="train and validate the real-data English fixation model"
+    )
+    provo.add_argument("dataset", help="canonical Provo eye-tracking CSV")
+    provo.add_argument("output", help="output .lem artifact")
+    provo.add_argument("--analyzer", required=True, help="path to the matching le-cli")
+    provo.add_argument("--report", help="write the full reproducibility report as JSON")
+    provo.add_argument("--folds", type=int, default=5)
+    provo.add_argument("--model-version", type=int, default=1)
+    provo.set_defaults(handler=_train_provo)
 
     plans = commands.add_parser(
         "summarize-plans", help="aggregate strategy-neutral offline plan metrics"

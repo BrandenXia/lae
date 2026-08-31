@@ -15,7 +15,9 @@ from .features import UnitFeatures, extract_features
 from .linear_salience import (
     FittedLinearSalience,
     LinearSalienceMetrics,
+    evaluate_linear_salience,
     fit_linear_salience,
+    linear_salience_metrics,
 )
 from .optimize import FittedPrefix, fit_prefix
 from .plan_evaluation import (
@@ -40,6 +42,7 @@ from .salience_dataset import (
     SalienceJsonlDataset,
     SalienceUnit,
 )
+from .provo import ProvoCorpus, ProvoTrainingResult, load_provo_corpus, train_provo_model
 
 __all__ = [
     "ABI_VERSION",
@@ -57,6 +60,8 @@ __all__ = [
     "PlanMetrics",
     "PlanRecord",
     "LinearSalienceMetrics",
+    "ProvoCorpus",
+    "ProvoTrainingResult",
     "SalienceExample",
     "SalienceFeature",
     "SalienceJsonlDataset",
@@ -76,8 +81,12 @@ __all__ = [
     "compare_plans",
     "compare_study",
     "evaluate_prefix",
+    "evaluate_linear_salience",
     "extract_features",
     "fit_prefix",
     "fit_linear_salience",
+    "linear_salience_metrics",
+    "load_provo_corpus",
+    "train_provo_model",
     "write_artifact",
 ]

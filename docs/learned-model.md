@@ -61,9 +61,25 @@ PYTHONPATH=training/src python3 -m lae_training fit-linear-salience \
 ```
 
 The report includes mean absolute error, root mean square error, and `R²` when
-target variance is nonzero. These are training-set diagnostics, not evidence of
-generalization. Real experiments should use held-out data and the independent
-evaluation framework.
+target variance is nonzero. For the generic command these are training-set
+diagnostics, not evidence of generalization. Real experiments should use
+held-out data and the independent evaluation framework.
+
+## Released real-data model
+
+Version 0.15 adds `train-provo`, a specialized reproducible path for the CC BY
+4.0 Provo eye-tracking corpus. It verifies the canonical source checksum,
+aggregates per-word fixation probability, and delegates feature discovery to a
+matching `le-cli` so training and inference cannot silently disagree about
+segmentation or function-word classification.
+
+Model candidates are evaluated with passage-grouped five-fold cross-validation
+and selected by held-out RMSE before the winner is refit on all compatible
+units. The released length-plus-function model achieves held-out MAE 0.09126,
+RMSE 0.11719, and R² 0.73414 across 2,661 units, reducing RMSE by 48.46% from a
+fold-specific mean-only baseline. See the
+[Provo fixation v1 model card](models/provo-fixation-v1.md) for provenance,
+attribution, intended use, and limitations.
 
 ## Runtime boundary
 

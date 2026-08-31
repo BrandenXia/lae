@@ -24,6 +24,8 @@ Use this checklist for a tagged LAE release.
   console entry point, and MIT license.
 - [ ] Python and Swift binding integration tests pass against the release shared
   library.
+- [ ] Released `.lem` assets load with `le-model`, match their report checksum,
+  and run through at least one public binding example.
 - [ ] Shared-library symbol audit exposes only the documented C ABI.
 - [ ] `git diff --check` passes and the release worktree is clean.
 

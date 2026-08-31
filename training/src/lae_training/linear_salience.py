@@ -72,8 +72,15 @@ def _solve(matrix: list[list[float]], target: list[float]) -> list[float]:
     return [augmented[index][-1] for index in range(size)]
 
 
-def _metrics(units: Sequence[SalienceUnit], model: FittedLinearSalience) -> LinearSalienceMetrics:
-    predictions = tuple(model.predict(unit) for unit in units)
+def linear_salience_metrics(
+    units: Sequence[SalienceUnit], predictions: Sequence[float]
+) -> LinearSalienceMetrics:
+    """Score already-produced predictions against labeled runtime units."""
+
+    if not units or len(units) != len(predictions):
+        raise ValueError("metrics require one prediction for every nonempty unit")
+    if any(not math.isfinite(prediction) for prediction in predictions):
+        raise ValueError("predictions must be finite")
     targets = tuple(unit.target_salience for unit in units)
     errors = tuple(predicted - target for predicted, target in zip(predictions, targets))
     target_mean = sum(targets) / len(targets)
@@ -85,6 +92,15 @@ def _metrics(units: Sequence[SalienceUnit], model: FittedLinearSalience) -> Line
         root_mean_square_error=math.sqrt(residual / len(errors)),
         r_squared=1.0 - residual / total if total > 0.0 else None,
     )
+
+
+def evaluate_linear_salience(
+    examples: Iterable[SalienceExample], model: FittedLinearSalience
+) -> LinearSalienceMetrics:
+    """Evaluate a fitted model on examples that were not necessarily used to fit it."""
+
+    units = tuple(unit for example in examples for unit in example.units)
+    return linear_salience_metrics(units, tuple(model.predict(unit) for unit in units))
 
 
 def fit_linear_salience(
@@ -139,6 +155,6 @@ def fit_linear_salience(
     return FittedLinearSalience(
         provisional.bias,
         provisional.weights,
-        _metrics(units, provisional),
+        linear_salience_metrics(units, tuple(provisional.predict(unit) for unit in units)),
         ridge,
     )

@@ -1,0 +1,22 @@
+LAE Provo Fixation v1 - data attribution notice
+
+This model is derived from:
+
+  Steven G. Luke and Kiel Christianson, "The Provo Corpus: A Large
+  Eye-Tracking Corpus with Predictability Norms," Behavior Research Methods
+  50 (2018), 826-833. https://doi.org/10.3758/s13428-017-0908-4
+
+Licensed material: https://osf.io/sjefs/
+Source license: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+
+Modifications: LAE aggregated each word's reader-level non-skip observations
+into fixation probability, retained tokens that map to one LAE English unit,
+selected a ridge-linear length/function model using passage-grouped five-fold
+cross-validation, refit the selected model on all compatible units, quantized
+its parameters to binary32, and compiled those parameters into a .lem artifact.
+No raw participant observations or passage text are included in the artifact.
+
+LAE code and the model packaging are released under the repository's MIT
+License. The attribution and CC BY 4.0 notice above apply to the source data and
+derived model.

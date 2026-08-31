@@ -541,6 +541,8 @@ Analysis JapaneseLanguageProvider::analyze(const Text& text, std::string_view la
                     return subunit.morphology == feature_lexical_core;
                 })) {
                 features.push_back(Feature{feature_content_unit, 1.0F});
+            } else {
+                features.push_back(Feature{feature_function_unit, 1.0F});
             }
             result.nodes.push_back(Node{
                 unit_id,

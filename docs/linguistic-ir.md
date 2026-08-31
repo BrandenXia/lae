@@ -34,7 +34,7 @@ each caller-supplied partition element. Provider nodes remain generic and are
 merged under the document root with document-relative spans, so existing
 reading models consume single- and mixed-language analyses identically.
 
-The stable features defined through ABI 1.8 are:
+The stable features defined through ABI 1.11 are:
 
 | Identifier | Meaning |
 |---|---|
@@ -45,6 +45,7 @@ The stable features defined through ABI 1.8 are:
 | `LE_FEATURE_DERIVATIONAL_AFFIX` | provider identifies a derivational affix |
 | `LE_FEATURE_GRAMMATICAL_AFFIX` | provider identifies a grammatical affix |
 | `LE_FEATURE_CONTENT_UNIT` | provider identifies a content-bearing unit |
+| `LE_FEATURE_FUNCTION_UNIT` | provider identifies a grammatical or closed-class unit |
 | `LE_FEATURE_SCRIPT_HAN` | node is represented in Han script |
 | `LE_FEATURE_SCRIPT_LATIN` | node is represented in Latin script |
 | `LE_FEATURE_SCRIPT_HIRAGANA` | node contains Hiragana script |

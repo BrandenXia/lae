@@ -108,6 +108,7 @@ bool known_feature(std::uint32_t feature) {
         std::uint32_t(LE_FEATURE_DERIVATIONAL_AFFIX),
         std::uint32_t(LE_FEATURE_GRAMMATICAL_AFFIX),
         std::uint32_t(LE_FEATURE_CONTENT_UNIT),
+        std::uint32_t(LE_FEATURE_FUNCTION_UNIT),
         std::uint32_t(LE_FEATURE_SCRIPT_HAN),
         std::uint32_t(LE_FEATURE_SCRIPT_LATIN),
         std::uint32_t(LE_FEATURE_SCRIPT_HIRAGANA),
@@ -160,6 +161,13 @@ void validate_metadata(const Artifact& artifact) {
             fail(ErrorKind::invalid, "model contains a duplicate required feature");
         }
         features.push_back(feature);
+    }
+    constexpr auto function_unit_minimum_abi = (1U << 16U) | 11U;
+    if (std::ranges::find(artifact.required_features,
+                          std::uint32_t(LE_FEATURE_FUNCTION_UNIT)) !=
+            artifact.required_features.end() &&
+        artifact.minimum_abi_version < function_unit_minimum_abi) {
+        fail(ErrorKind::invalid, "function-unit models must require runtime ABI 1.11 or newer");
     }
     if (artifact.type == LE_MODEL_PREFIX) {
         if (artifact.prefix_strategy != LE_PREFIX_PROPORTIONAL &&

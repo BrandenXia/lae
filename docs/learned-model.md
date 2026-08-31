@@ -36,6 +36,12 @@ Feature values are quantized to IEEE-754 binary32, matching the runtime IR.
 Targets are normalized to `[0,1]`. Feature IDs must be stable identifiers known
 to the runtime; duplicate or unknown IDs are rejected.
 
+ABI 1.11 adds `LE_FEATURE_FUNCTION_UNIT`, allowing a model to learn a distinct
+weight for grammatical and closed-class units across providers. Any artifact
+that declares this feature must set its minimum runtime ABI to at least 1.11;
+older runtimes therefore reject it before inference rather than silently
+treating the unavailable feature as zero.
+
 ## Fitting
 
 The standard-library trainer solves ridge-regularized least squares using

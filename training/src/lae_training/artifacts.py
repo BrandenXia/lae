@@ -15,12 +15,13 @@ MAGIC = b"LAEMODL\0"
 FORMAT_VERSION = (1, 0)
 HEADER_SIZE = 64
 MAXIMUM_ARTIFACT_SIZE = 16 * 1024 * 1024
-ABI_VERSION = (1 << 16) | 10
+ABI_VERSION = (1 << 16) | 11
 MODEL_PREFIX = 1
 MODEL_LEXICAL_CORE = 2
 MODEL_LINEAR_SALIENCE = 3
 LINEAR_SALIENCE_MINIMUM_ABI = (1 << 16) | 6
 FEATURE_LEXICAL_CORE = 0x00010001
+FEATURE_FUNCTION_UNIT = 0x00030002
 PREFIX_PROPORTIONAL = 1
 PREFIX_FIXED = 2
 
@@ -82,6 +83,8 @@ def _encode(
     language_values = _languages(languages)
     if len(required_features) > 256 or len(set(required_features)) != len(required_features):
         raise ValueError("required features must be unique and contain at most 256 entries")
+    if FEATURE_FUNCTION_UNIT in required_features and minimum_abi < ((1 << 16) | 11):
+        raise ValueError("function-unit models must require runtime ABI 1.11 or newer")
     language_table = b"".join(
         struct.pack("<H", len(language.encode("ascii"))) + language.encode("ascii")
         for language in language_values

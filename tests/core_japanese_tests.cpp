@@ -139,6 +139,8 @@ int main() {
           "standalone copula is grammatical rather than lexical");
     check(!has_feature(copula, feature_content_unit),
           "standalone grammatical unit is not marked content-bearing");
+    check(has_feature(copula, feature_function_unit),
+          "standalone grammatical unit is marked as a function unit");
 
     const Text derivation("読みやすかった。読みにくくない。食べていました。行かなかった。");
     const auto derivation_analysis = provider.analyze(derivation, "ja");

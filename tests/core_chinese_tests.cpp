@@ -84,6 +84,8 @@ int main() {
                   "segmented unit carries Han script feature");
             check(has_feature(unit, feature_segmentation_confidence, 1.0F),
                   "dictionary unit has full segmentation confidence");
+            check(has_feature(unit, feature_content_unit, 1.0F),
+                  "dictionary lexical unit is content-bearing");
             check(!unit.children.empty(), "word unit owns character subunits");
             for (const auto character_id : unit.children) {
                 const auto& character = analysis.nodes[character_id.value()];
@@ -104,6 +106,9 @@ int main() {
          fallback.nodes[fallback.nodes.front().children.front().value()].children) {
         check(has_feature(fallback.nodes[unit_id.value()], feature_segmentation_confidence, 0.25F),
               "fallback character has low segmentation confidence");
+        check(!has_feature(fallback.nodes[unit_id.value()], feature_content_unit, 1.0F) &&
+                  !has_feature(fallback.nodes[unit_id.value()], feature_function_unit, 1.0F),
+              "unknown character does not receive a guessed semantic class");
     }
 
     const Text scripts("𠀀中文AI");
@@ -118,6 +123,29 @@ int main() {
             .nodes[script_analysis.nodes[script_sentence.value()].children.back().value()];
     check(has_feature(latin_unit, feature_script_latin, 1.0F),
           "Latin run carries Latin script feature");
+    check(has_feature(latin_unit, feature_content_unit, 1.0F),
+          "embedded Latin run is content-bearing");
+
+    const Text semantic_text("我在研究语言，因为它很重要。");
+    const auto semantic = provider.analyze(semantic_text, "zh-Hans");
+    validate_analysis(semantic_text, semantic);
+    check(sentence_units(semantic_text, semantic, 0) ==
+              std::vector<std::string_view>{"我", "在", "研究", "语言", "因为", "它", "很", "重要"},
+          "Chinese segmentation recognizes function and content units together");
+    const auto semantic_sentence = semantic.nodes.front().children.front();
+    const auto& semantic_units = semantic.nodes[semantic_sentence.value()].children;
+    const std::vector<FeatureId> expected_semantics{
+        feature_function_unit, feature_function_unit, feature_content_unit,  feature_content_unit,
+        feature_function_unit, feature_function_unit, feature_function_unit, feature_content_unit,
+    };
+    check(semantic_units.size() == expected_semantics.size(),
+          "semantic Chinese sample has the expected unit count");
+    for (std::size_t index = 0; index < std::min(semantic_units.size(), expected_semantics.size());
+         ++index) {
+        check(has_feature(semantic.nodes[semantic_units[index].value()], expected_semantics[index],
+                          1.0F),
+              "Chinese unit receives its provider-neutral semantic class");
+    }
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

@@ -37,6 +37,7 @@ inline constexpr FeatureId feature_lexical_core = 0x00010001u;
 inline constexpr FeatureId feature_derivational_affix = 0x00010002u;
 inline constexpr FeatureId feature_grammatical_affix = 0x00010003u;
 inline constexpr FeatureId feature_content_unit = 0x00030001u;
+inline constexpr FeatureId feature_function_unit = 0x00030002u;
 inline constexpr FeatureId feature_script_han = 0x00040001u;
 inline constexpr FeatureId feature_script_latin = 0x00040002u;
 inline constexpr FeatureId feature_script_hiragana = 0x00040003u;

@@ -58,6 +58,22 @@ class SalienceDatasetTests(unittest.TestCase):
             (0x00040003, 0x00040004),
         )
 
+    def test_function_unit_feature_is_supported(self) -> None:
+        example = parse_salience_record(
+            {
+                "schema_version": 1,
+                "id": "function-unit",
+                "language": "en",
+                "units": [
+                    {
+                        "features": [{"id": 0x00030002, "value": 1}],
+                        "target_salience": 0.1,
+                    }
+                ],
+            }
+        )
+        self.assertEqual(example.units[0].feature_value(0x00030002), 1.0)
+
     def test_duplicate_features_are_rejected(self) -> None:
         with self.assertRaises(DatasetError):
             parse_salience_record(
@@ -106,6 +122,12 @@ class LinearSalienceTrainingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at least 1.6"):
             build_linear_salience_artifact(
                 0.0, ((2, 0.2),), minimum_abi=(1 << 16) | 5
+            )
+
+    def test_function_feature_requires_abi_1_11(self) -> None:
+        with self.assertRaisesRegex(ValueError, "1.11"):
+            build_linear_salience_artifact(
+                0.0, ((0x00030002, -0.4),), minimum_abi=(1 << 16) | 10
             )
 
 

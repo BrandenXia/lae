@@ -10,14 +10,17 @@ The provider emits:
 - segmented lexical unit nodes carrying `LE_FEATURE_LEXICAL_CORE`;
 - grapheme-level subunits that distinguish characters from lexical units;
 - Han and Latin script features;
-- normalized segmentation-confidence features.
+- normalized segmentation-confidence features;
+- provider-neutral content-unit and function-unit classification.
 
 Contiguous Han text is segmented with deterministic dynamic programming over a
 small built-in simplified/traditional lexicon. The objective first maximizes
 dictionary-covered graphemes, then minimizes unit count, then prefers the
 longer current match. This resolves `研究生命` as `研究 + 生命` instead of
-`研究生 + 命`. Unknown Han text falls back to one-character units with lower
-confidence. Adjacent non-Han letters or numbers form a separate unit.
+`研究生 + 命`. The lexicon also recognizes a compact set of pronouns, particles,
+auxiliaries, and connectives as function units. Unknown Han text falls back to
+one-character units with lower confidence and no guessed semantic class.
+Adjacent non-Han letters or numbers form a separate content unit.
 
 ## Deliberate limits
 

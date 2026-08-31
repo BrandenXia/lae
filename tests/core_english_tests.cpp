@@ -24,6 +24,18 @@ struct ExpectedSubunit {
     le::core::FeatureId feature;
 };
 
+std::string_view slice(const le::core::Text& text, const le::core::Node& node) {
+    const auto begin = static_cast<std::size_t>(node.span.begin().value());
+    const auto size = static_cast<std::size_t>(node.span.end().value() - node.span.begin().value());
+    return text.bytes().substr(begin, size);
+}
+
+bool has_feature(const le::core::Node& node, le::core::FeatureId id, float value = 1.0F) {
+    return std::ranges::any_of(node.features, [=](const le::core::Feature& feature) {
+        return feature.id == id && feature.value == value;
+    });
+}
+
 } // namespace
 
 int main() {
@@ -43,11 +55,17 @@ int main() {
     std::size_t sentences = 0;
     std::size_t units = 0;
     std::vector<ExpectedSubunit> subunits;
+    std::vector<FeatureId> semantic_features;
     for (const auto& node : analysis.nodes) {
         if (node.kind == NodeKind::sentence) {
             ++sentences;
         } else if (node.kind == NodeKind::unit) {
             ++units;
+            check(has_feature(node, feature_segmentation_confidence),
+                  "English tokenization has full segmentation confidence");
+            semantic_features.push_back(has_feature(node, feature_function_unit)
+                                            ? feature_function_unit
+                                            : feature_content_unit);
         } else if (node.kind == NodeKind::subunit) {
             const auto begin = static_cast<std::size_t>(node.span.begin().value());
             const auto size =
@@ -60,6 +78,10 @@ int main() {
     }
     check(sentences == 2, "terminal punctuation creates two sentence nodes");
     check(units == 6, "letter runs create six unit nodes");
+    check(semantic_features == std::vector<FeatureId>{feature_content_unit, feature_content_unit,
+                                                      feature_function_unit, feature_content_unit,
+                                                      feature_content_unit, feature_content_unit},
+          "closed-class English token is distinguished from content units");
 
     const std::vector<ExpectedSubunit> expected{
         {"Un", feature_derivational_affix},   {"believ", feature_lexical_core},
@@ -82,6 +104,44 @@ int main() {
     const auto unicode_analysis = provider.analyze(unicode, "en");
     validate_analysis(unicode, unicode_analysis);
     check(unicode_analysis.nodes.size() >= 5, "Unicode letters and curly apostrophes remain valid");
+    std::vector<ExpectedSubunit> unicode_subunits;
+    for (const auto& node : unicode_analysis.nodes) {
+        if (node.kind == NodeKind::subunit) {
+            unicode_subunits.push_back({slice(unicode, node), node.features.back().id});
+        }
+    }
+    const std::vector<ExpectedSubunit> expected_unicode{
+        {"Éclair", feature_lexical_core},
+        {"can", feature_lexical_core},
+        {"’t", feature_grammatical_affix},
+    };
+    check(unicode_subunits.size() == expected_unicode.size(),
+          "curly-apostrophe contraction has explicit morphology");
+    for (std::size_t index = 0; index < std::min(unicode_subunits.size(), expected_unicode.size());
+         ++index) {
+        check(unicode_subunits[index].text == expected_unicode[index].text,
+              "Unicode morphology preserves byte-exact subunit text");
+        check(unicode_subunits[index].feature == expected_unicode[index].feature,
+              "Unicode morphology assigns the expected feature");
+    }
+    const auto unicode_sentence = unicode_analysis.nodes.front().children.front();
+    const auto contraction_unit =
+        unicode_analysis
+            .nodes[unicode_analysis.nodes[unicode_sentence.value()].children.back().value()];
+    check(has_feature(contraction_unit, feature_function_unit),
+          "contracted auxiliary is classified as a function unit");
+
+    const Text protected_functions("Under does");
+    const auto protected_analysis = provider.analyze(protected_functions, "en");
+    validate_analysis(protected_functions, protected_analysis);
+    std::vector<std::string_view> protected_subunits;
+    for (const auto& node : protected_analysis.nodes) {
+        if (node.kind == NodeKind::subunit) {
+            protected_subunits.push_back(slice(protected_functions, node));
+        }
+    }
+    check(protected_subunits == std::vector<std::string_view>{"Under", "does"},
+          "closed-class words are protected from coincidental affix matches");
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

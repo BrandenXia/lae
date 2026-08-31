@@ -47,18 +47,24 @@ not claim linguistic word boundaries.
 The English provider emits document, sentence, unit, and subunit structure. A
 small deterministic ruleset labels lexical cores and grammatical or
 derivational affixes. It is a framework-validation baseline, not a general
-morphological analyzer; its limitations are documented separately.
+morphological analyzer. Recognized closed-class forms carry the same
+function-unit fact used by other providers; its limitations are documented
+separately.
 
 The Chinese provider emits sentence nodes, lexically segmented unit nodes, and
 grapheme-level subunits without depending on whitespace. A deterministic
 coverage-based segmenter uses a compact built-in lexicon and falls back to
 individual Han characters. Script and segmentation-confidence features make
-the distinction explicit without adding a language-specific node kind.
+the distinction explicit without adding a language-specific node kind. Known
+lexical and grammatical entries carry complementary content-unit and
+function-unit facts.
 
 The Japanese provider groups mixed-script content with following okurigana or
 particles and applies a compact longest-suffix morphology baseline. Lexical,
 grammatical, derivational, Han, Hiragana, Katakana, and Latin facts remain
-ordinary features on generic unit and subunit nodes.
+ordinary features on generic unit and subunit nodes. Standalone grammatical
+forms are function units, while forms containing a lexical core are content
+units.
 
 Provider output is validated before it reaches a reading model. Validation
 checks the document root, dense node identifiers, single-parent tree structure,

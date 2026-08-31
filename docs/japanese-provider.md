@@ -10,7 +10,9 @@ The provider emits:
 - units formed from script runs plus following Hiragana okurigana or particles;
 - lexical-core, grammatical-affix, and derivational-affix subunits;
 - Han, Hiragana, Katakana, and Latin script features;
-- normalized segmentation-confidence and content-unit features.
+- normalized segmentation-confidence features;
+- content-unit classification for lexical forms and function-unit
+  classification for standalone grammatical forms.
 
 A deterministic longest-suffix ruleset recognizes a compact baseline of
 particles, polite forms, auxiliaries, inflections, and the productive endings

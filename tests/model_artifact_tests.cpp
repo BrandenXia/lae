@@ -63,7 +63,7 @@ int main() {
           "artifact header and total sizes are encoded");
     check(read_u32(prefix_bytes, 20) == le::model::checksum(prefix_bytes),
           "artifact stores its CRC-32 checksum");
-    check(read_u32(prefix_bytes, 20) == 0x18B08458U,
+    check(read_u32(prefix_bytes, 20) == 0xD2630AD7U,
           "prefix artifact matches the v1 golden checksum");
     const auto loaded_prefix = le::model::load(prefix_bytes);
     check(loaded_prefix.type == LE_MODEL_PREFIX && loaded_prefix.model_version == 7,
@@ -136,6 +136,14 @@ int main() {
     check(loaded_japanese_linear.required_features ==
               std::vector<std::uint32_t>{LE_FEATURE_SCRIPT_HIRAGANA, LE_FEATURE_SCRIPT_KATAKANA},
           "ABI 1.8 Japanese script features are artifact-compatible");
+
+    auto function_linear = linear;
+    function_linear.required_features = {LE_FEATURE_FUNCTION_UNIT};
+    function_linear.linear_weights = {{LE_FEATURE_FUNCTION_UNIT, -0.4F}};
+    const auto loaded_function_linear = le::model::load(le::model::encode(function_linear));
+    check(loaded_function_linear.required_features ==
+              std::vector<std::uint32_t>{LE_FEATURE_FUNCTION_UNIT},
+          "ABI 1.11 function-unit feature is artifact-compatible");
 
     auto corrupted = prefix_bytes;
     corrupted.back() ^= 0x01U;
@@ -221,6 +229,16 @@ int main() {
     } catch (const le::model::ArtifactError& error) {
         check(error.kind() == le::model::ErrorKind::invalid,
               "linear model cannot claim a pre-1.6 ABI");
+    }
+
+    try {
+        auto stale_function_abi = function_linear;
+        stale_function_abi.minimum_abi_version = (1U << 16U) | 10U;
+        static_cast<void>(le::model::encode(stale_function_abi));
+        check(false, "function-unit model cannot claim a pre-1.11 ABI");
+    } catch (const le::model::ArtifactError& error) {
+        check(error.kind() == le::model::ErrorKind::invalid,
+              "function-unit model cannot claim a pre-1.11 ABI");
     }
 
     if (failures != 0) {

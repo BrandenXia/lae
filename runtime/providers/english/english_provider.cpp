@@ -67,9 +67,51 @@ constexpr std::array suffixes{
 };
 
 constexpr std::array contractions{
+    std::string_view("n't"), std::string_view("n’t"), std::string_view("'re"),
+    std::string_view("’re"), std::string_view("'ve"), std::string_view("’ve"),
+    std::string_view("'ll"), std::string_view("’ll"), std::string_view("'s"),
+    std::string_view("’s"),  std::string_view("'d"),  std::string_view("’d"),
+    std::string_view("'m"),  std::string_view("’m"),
+};
+
+constexpr std::array normalized_contractions{
     std::string_view("n't"), std::string_view("'re"), std::string_view("'ve"),
     std::string_view("'ll"), std::string_view("'s"),  std::string_view("'d"),
     std::string_view("'m"),
+};
+
+constexpr std::array function_words{
+    std::string_view("a"),        std::string_view("about"),  std::string_view("after"),
+    std::string_view("although"), std::string_view("am"),     std::string_view("an"),
+    std::string_view("and"),      std::string_view("are"),    std::string_view("as"),
+    std::string_view("at"),       std::string_view("be"),     std::string_view("because"),
+    std::string_view("been"),     std::string_view("before"), std::string_view("being"),
+    std::string_view("between"),  std::string_view("but"),    std::string_view("by"),
+    std::string_view("can"),      std::string_view("could"),  std::string_view("did"),
+    std::string_view("do"),       std::string_view("does"),   std::string_view("during"),
+    std::string_view("for"),      std::string_view("from"),   std::string_view("had"),
+    std::string_view("has"),      std::string_view("have"),   std::string_view("he"),
+    std::string_view("her"),      std::string_view("him"),    std::string_view("his"),
+    std::string_view("i"),        std::string_view("if"),     std::string_view("in"),
+    std::string_view("into"),     std::string_view("is"),     std::string_view("it"),
+    std::string_view("its"),      std::string_view("may"),    std::string_view("me"),
+    std::string_view("might"),    std::string_view("must"),   std::string_view("no"),
+    std::string_view("nor"),      std::string_view("not"),    std::string_view("of"),
+    std::string_view("on"),       std::string_view("onto"),   std::string_view("or"),
+    std::string_view("our"),      std::string_view("over"),   std::string_view("per"),
+    std::string_view("shall"),    std::string_view("she"),    std::string_view("should"),
+    std::string_view("so"),       std::string_view("than"),   std::string_view("that"),
+    std::string_view("the"),      std::string_view("their"),  std::string_view("them"),
+    std::string_view("then"),     std::string_view("these"),  std::string_view("they"),
+    std::string_view("this"),     std::string_view("those"),  std::string_view("though"),
+    std::string_view("through"),  std::string_view("to"),     std::string_view("under"),
+    std::string_view("up"),       std::string_view("us"),     std::string_view("via"),
+    std::string_view("was"),      std::string_view("we"),     std::string_view("were"),
+    std::string_view("what"),     std::string_view("when"),   std::string_view("where"),
+    std::string_view("which"),    std::string_view("while"),  std::string_view("who"),
+    std::string_view("whom"),     std::string_view("whose"),  std::string_view("will"),
+    std::string_view("with"),     std::string_view("within"), std::string_view("without"),
+    std::string_view("would"),    std::string_view("you"),    std::string_view("your"),
 };
 
 bool is_letter(std::int32_t code_point) {
@@ -100,20 +142,60 @@ bool ends_with(std::string_view text, std::string_view suffix, std::size_t end) 
 }
 
 std::string ascii_lower(std::string_view text) {
-    if (std::ranges::any_of(
-            text, [](char character) { return static_cast<unsigned char>(character) >= 0x80; })) {
-        return {};
-    }
     std::string result(text);
     std::ranges::transform(result, result.begin(), [](unsigned char character) {
-        return static_cast<char>(std::tolower(character));
+        return character < 0x80 ? static_cast<char>(std::tolower(character))
+                                : static_cast<char>(character);
     });
     return result;
 }
 
+std::string function_key(std::string_view token) {
+    std::string result;
+    result.reserve(token.size());
+    for (std::size_t index = 0; index < token.size();) {
+        const auto byte = static_cast<unsigned char>(token[index]);
+        if (index + 3 <= token.size() && token.substr(index, 3) == "’") {
+            result.push_back('\'');
+            index += 3;
+            continue;
+        }
+        if (byte >= 0x80) {
+            return {};
+        }
+        result.push_back(static_cast<char>(std::tolower(byte)));
+        ++index;
+    }
+    return result;
+}
+
+bool is_function_unit(std::string_view token) {
+    const auto key = function_key(token);
+    if (key.empty()) {
+        return false;
+    }
+    if (std::ranges::find(function_words, key) != function_words.end()) {
+        return true;
+    }
+    for (const auto contraction : normalized_contractions) {
+        if (!key.ends_with(contraction) || key.size() == contraction.size()) {
+            continue;
+        }
+        const auto base = key.substr(0, key.size() - contraction.size());
+        if (std::ranges::find(function_words, base) != function_words.end()) {
+            return true;
+        }
+        if (contraction == "n't" && (key == "can't" || key == "won't" || key == "shan't")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::vector<SubunitSpec> analyze_morphology(std::string_view token) {
     const auto lower = ascii_lower(token);
-    if (lower.empty()) {
+    if (is_function_unit(token) && lower.find('\'') == std::string::npos &&
+        lower.find("’") == std::string::npos) {
         return {{0, token.size(), feature_lexical_core}};
     }
 
@@ -122,11 +204,20 @@ std::vector<SubunitSpec> analyze_morphology(std::string_view token) {
     std::vector<SubunitSpec> result;
 
     FeatureId suffix_feature = 0;
-    for (const auto contraction : contractions) {
-        if (ends_with(lower, contraction, core_end) && core_end - contraction.size() > core_begin) {
-            core_end -= contraction.size();
-            suffix_feature = feature_grammatical_affix;
-            break;
+    const auto reduced_negative = lower == "can't" || lower == "can’t" || lower == "won't" ||
+                                  lower == "won’t" || lower == "shan't" || lower == "shan’t";
+    if (reduced_negative) {
+        const auto suffix = lower.ends_with("’t") ? std::string_view("’t") : std::string_view("'t");
+        core_end -= suffix.size();
+        suffix_feature = feature_grammatical_affix;
+    } else {
+        for (const auto contraction : contractions) {
+            if (ends_with(lower, contraction, core_end) &&
+                core_end - contraction.size() > core_begin) {
+                core_end -= contraction.size();
+                suffix_feature = feature_grammatical_affix;
+                break;
+            }
         }
     }
     if (suffix_feature == 0) {
@@ -236,18 +327,23 @@ Analysis EnglishLanguageProvider::analyze(const Text& text, std::string_view lan
 
         for (const auto& token : sentence.tokens) {
             const auto unit_id = NodeId(static_cast<std::uint32_t>(result.nodes.size()));
-            result.nodes.push_back(
-                Node{unit_id,
-                     token.span,
-                     NodeKind::unit,
-                     {},
-                     {Feature{feature_grapheme_count, static_cast<float>(token.grapheme_count)}}});
-            result.nodes[sentence_id.value()].children.push_back(unit_id);
-
             const auto token_begin = static_cast<std::size_t>(token.span.begin().value());
             const auto token_size =
                 static_cast<std::size_t>(token.span.end().value() - token.span.begin().value());
             const auto token_text = text.bytes().substr(token_begin, token_size);
+            result.nodes.push_back(Node{
+                unit_id,
+                token.span,
+                NodeKind::unit,
+                {},
+                {Feature{feature_grapheme_count, static_cast<float>(token.grapheme_count)},
+                 Feature{feature_segmentation_confidence, 1.0F},
+                 Feature{is_function_unit(token_text) ? feature_function_unit
+                                                      : feature_content_unit,
+                         1.0F}},
+            });
+            result.nodes[sentence_id.value()].children.push_back(unit_id);
+
             for (const auto& subunit : analyze_morphology(token_text)) {
                 const auto subunit_id = NodeId(static_cast<std::uint32_t>(result.nodes.size()));
                 result.nodes.push_back(Node{subunit_id,

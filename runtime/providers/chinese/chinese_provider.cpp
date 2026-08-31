@@ -17,6 +17,7 @@ struct UnitSpec {
     TextSpan span;
     std::vector<TextSpan> characters;
     FeatureId script;
+    FeatureId semantic;
     float segmentation_confidence;
 };
 
@@ -31,19 +32,51 @@ struct SegmentationChoice {
     std::size_t next;
     std::size_t length;
     bool dictionary_match;
+    FeatureId semantic;
+};
+
+struct LexiconEntry {
+    std::string_view text;
+    FeatureId semantic;
 };
 
 constexpr std::array lexicon{
-    std::string_view("中华"),   std::string_view("中華"),     std::string_view("人民"),
-    std::string_view("共和国"), std::string_view("共和國"),   std::string_view("中文"),
-    std::string_view("语言"),   std::string_view("語言"),     std::string_view("框架"),
-    std::string_view("分词"),   std::string_view("分詞"),     std::string_view("没有"),
-    std::string_view("沒有"),   std::string_view("空格"),     std::string_view("边界"),
-    std::string_view("邊界"),   std::string_view("研究"),     std::string_view("研究生"),
-    std::string_view("生命"),   std::string_view("起源"),     std::string_view("南京"),
-    std::string_view("南京市"), std::string_view("市长"),     std::string_view("市長"),
-    std::string_view("长江"),   std::string_view("長江"),     std::string_view("大桥"),
-    std::string_view("大橋"),   std::string_view("长江大桥"), std::string_view("長江大橋"),
+    LexiconEntry{"中华", feature_content_unit},     LexiconEntry{"中華", feature_content_unit},
+    LexiconEntry{"人民", feature_content_unit},     LexiconEntry{"共和国", feature_content_unit},
+    LexiconEntry{"共和國", feature_content_unit},   LexiconEntry{"中文", feature_content_unit},
+    LexiconEntry{"语言", feature_content_unit},     LexiconEntry{"語言", feature_content_unit},
+    LexiconEntry{"框架", feature_content_unit},     LexiconEntry{"分词", feature_content_unit},
+    LexiconEntry{"分詞", feature_content_unit},     LexiconEntry{"没有", feature_function_unit},
+    LexiconEntry{"沒有", feature_function_unit},    LexiconEntry{"空格", feature_content_unit},
+    LexiconEntry{"边界", feature_content_unit},     LexiconEntry{"邊界", feature_content_unit},
+    LexiconEntry{"研究", feature_content_unit},     LexiconEntry{"研究生", feature_content_unit},
+    LexiconEntry{"生命", feature_content_unit},     LexiconEntry{"起源", feature_content_unit},
+    LexiconEntry{"南京", feature_content_unit},     LexiconEntry{"南京市", feature_content_unit},
+    LexiconEntry{"市长", feature_content_unit},     LexiconEntry{"市長", feature_content_unit},
+    LexiconEntry{"长江", feature_content_unit},     LexiconEntry{"長江", feature_content_unit},
+    LexiconEntry{"大桥", feature_content_unit},     LexiconEntry{"大橋", feature_content_unit},
+    LexiconEntry{"长江大桥", feature_content_unit}, LexiconEntry{"長江大橋", feature_content_unit},
+    LexiconEntry{"重要", feature_content_unit},     LexiconEntry{"因为", feature_function_unit},
+    LexiconEntry{"因為", feature_function_unit},    LexiconEntry{"所以", feature_function_unit},
+    LexiconEntry{"但是", feature_function_unit},    LexiconEntry{"而且", feature_function_unit},
+    LexiconEntry{"如果", feature_function_unit},    LexiconEntry{"虽然", feature_function_unit},
+    LexiconEntry{"雖然", feature_function_unit},    LexiconEntry{"我", feature_function_unit},
+    LexiconEntry{"你", feature_function_unit},      LexiconEntry{"他", feature_function_unit},
+    LexiconEntry{"她", feature_function_unit},      LexiconEntry{"它", feature_function_unit},
+    LexiconEntry{"们", feature_function_unit},      LexiconEntry{"們", feature_function_unit},
+    LexiconEntry{"的", feature_function_unit},      LexiconEntry{"了", feature_function_unit},
+    LexiconEntry{"在", feature_function_unit},      LexiconEntry{"是", feature_function_unit},
+    LexiconEntry{"和", feature_function_unit},      LexiconEntry{"与", feature_function_unit},
+    LexiconEntry{"與", feature_function_unit},      LexiconEntry{"及", feature_function_unit},
+    LexiconEntry{"而", feature_function_unit},      LexiconEntry{"被", feature_function_unit},
+    LexiconEntry{"把", feature_function_unit},      LexiconEntry{"对", feature_function_unit},
+    LexiconEntry{"對", feature_function_unit},      LexiconEntry{"于", feature_function_unit},
+    LexiconEntry{"於", feature_function_unit},      LexiconEntry{"着", feature_function_unit},
+    LexiconEntry{"著", feature_function_unit},      LexiconEntry{"过", feature_function_unit},
+    LexiconEntry{"過", feature_function_unit},      LexiconEntry{"吗", feature_function_unit},
+    LexiconEntry{"嗎", feature_function_unit},      LexiconEntry{"呢", feature_function_unit},
+    LexiconEntry{"吧", feature_function_unit},      LexiconEntry{"也", feature_function_unit},
+    LexiconEntry{"都", feature_function_unit},      LexiconEntry{"很", feature_function_unit},
 };
 
 bool is_han(std::int32_t code_point) {
@@ -121,20 +154,25 @@ std::vector<UnitSpec> segment_han(const Text& text, std::size_t run_begin, std::
     const auto& graphemes = text.graphemes();
     const auto size = run_end - run_begin;
     std::vector<SegmentationChoice> choices(size + 1);
-    choices[size] = SegmentationChoice{0, 0, size, 0, false};
+    choices[size] = SegmentationChoice{0, 0, size, 0, false, 0};
 
     for (std::size_t position = size; position-- > 0;) {
         const auto& fallback_tail = choices[position + 1];
         choices[position] = SegmentationChoice{
-            fallback_tail.known_graphemes, fallback_tail.unit_count + 1, position + 1, 1, false};
-        for (const auto word : lexicon) {
-            const auto length = match_length(text, graphemes, run_begin, run_end, position, word);
+            fallback_tail.known_graphemes, fallback_tail.unit_count + 1, position + 1, 1, false, 0};
+        for (const auto& entry : lexicon) {
+            const auto length =
+                match_length(text, graphemes, run_begin, run_end, position, entry.text);
             if (length == 0) {
                 continue;
             }
             const auto& tail = choices[position + length];
-            const SegmentationChoice candidate{tail.known_graphemes + length, tail.unit_count + 1,
-                                               position + length, length, true};
+            const SegmentationChoice candidate{tail.known_graphemes + length,
+                                               tail.unit_count + 1,
+                                               position + length,
+                                               length,
+                                               true,
+                                               entry.semantic};
             if (better(candidate, choices[position])) {
                 choices[position] = candidate;
             }
@@ -153,6 +191,7 @@ std::vector<UnitSpec> segment_han(const Text& text, std::size_t run_begin, std::
             TextSpan(characters.front().begin(), characters.back().end()),
             std::move(characters),
             feature_script_han,
+            choice.semantic,
             choice.dictionary_match ? 1.0F : 0.25F,
         });
         position = choice.next;
@@ -173,6 +212,7 @@ UnitSpec make_non_han_unit(const std::vector<Grapheme>& graphemes, std::size_t b
         TextSpan(characters.front().begin(), characters.back().end()),
         std::move(characters),
         latin ? feature_script_latin : FeatureId(0),
+        feature_content_unit,
         0.5F,
     };
 }
@@ -261,6 +301,9 @@ Analysis ChineseLanguageProvider::analyze(const Text& text, std::string_view lan
             };
             if (unit.script != 0) {
                 features.push_back(Feature{unit.script, 1.0F});
+            }
+            if (unit.semantic != 0) {
+                features.push_back(Feature{unit.semantic, 1.0F});
             }
             result.nodes.push_back(
                 Node{unit_id, unit.span, NodeKind::unit, {}, std::move(features)});

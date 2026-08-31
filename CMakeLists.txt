@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.13.1 LANGUAGES C CXX)
+project(lae VERSION 0.14.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)

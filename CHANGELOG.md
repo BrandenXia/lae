@@ -8,6 +8,31 @@ model artifact format.
 
 No changes yet.
 
+## [0.14.0] - 2026-08-31
+
+### Added
+
+- Stable `LE_FEATURE_FUNCTION_UNIT` semantic feature for provider-neutral
+  content/function classification.
+- English closed-class classification, Chinese function-unit lexicon entries,
+  and Japanese standalone grammatical-unit classification.
+- Runtime and training artifact validation for models that consume the new
+  feature, including an ABI 1.11 minimum-version requirement.
+
+### Improved
+
+- English morphology now recognizes contractions containing straight or curly
+  apostrophes while preserving their original UTF-8 spans.
+
+### Compatibility
+
+- Runtime version: 0.14.0.
+- C ABI: 1.11.
+- Provider ABI: 1.0 (unchanged).
+- Model artifact format: 1.0 (unchanged).
+- Python runtime binding: 0.14.0.
+- Python training package: 0.4.1.
+
 ## [0.13.1] - 2026-08-31
 
 ### Improved

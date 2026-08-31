@@ -35,6 +35,7 @@ typedef uint32_t le_feature_id_t;
 #define LE_FEATURE_DERIVATIONAL_AFFIX ((le_feature_id_t)0x00010002u)
 #define LE_FEATURE_GRAMMATICAL_AFFIX ((le_feature_id_t)0x00010003u)
 #define LE_FEATURE_CONTENT_UNIT ((le_feature_id_t)0x00030001u)
+#define LE_FEATURE_FUNCTION_UNIT ((le_feature_id_t)0x00030002u)
 #define LE_FEATURE_SCRIPT_HAN ((le_feature_id_t)0x00040001u)
 #define LE_FEATURE_SCRIPT_LATIN ((le_feature_id_t)0x00040002u)
 #define LE_FEATURE_SCRIPT_HIRAGANA ((le_feature_id_t)0x00040003u)

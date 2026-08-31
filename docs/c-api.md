@@ -21,6 +21,7 @@ ABI 1.7 adds provider ABI v1, runtime-local provider discovery and registration,
 and optional dynamic module loading.
 ABI 1.8 adds stable Hiragana and Katakana script feature identifiers and the
 built-in Japanese provider without changing public structure layouts.
+ABI 1.9 adds `le_analyze_regions` for explicit mixed-language provider routing.
 
 ## Function contracts
 
@@ -40,6 +41,7 @@ built-in Japanese provider without changing public structure layouts.
 | `le_model_destroy` | Null accepted; consumes model | Safe for an unshared handle | No failure |
 | `le_model_*` metadata accessors | Null returns zero/empty; model borrowed | Safe | Views last until model destruction |
 | `le_analyze` | Runtime/output required; text and language borrowed during call; caller owns analysis | Concurrent calls are safe | Validates UTF-8 and provider output; writes null before failure |
+| `le_analyze_regions` | Runtime/output required; region array, language views, and text borrowed during call | Concurrent calls are safe | Requires exact grapheme-aligned coverage; routes and validates each provider; writes null before failure |
 | `le_analysis_*_count` | Null returns zero; analysis borrowed | Safe | Analysis must still be alive |
 | `le_analysis_*_data` | Null/empty returns null; arrays and language bytes are borrowed | Safe | Views last until analysis destruction |
 | `le_analysis_destroy` | Null accepted; consumes analysis and nested storage | Safe for an unshared handle | No failure |
@@ -96,17 +98,22 @@ tail padding so the v2 and v3 size boundaries remain distinguishable.
 `language` is a non-null-terminated borrowed BCP-47-compatible byte view. The
 router queries registered external providers first, then selects English for
 `en` / `en-*`, Chinese for `zh` / `zh-*`, and Japanese for `ja` / `ja-*`; the
-generic fallback records all other tags as region metadata but does not interpret them. Empty language means
-`und`. This preserves explicit routing information without putting language
-behavior in the core. There is no automatic or mixed-language detection in this
-version. The complete provider contract is documented in the
+generic fallback records all other tags as region metadata but does not interpret
+them. Empty language means `und`. This preserves explicit routing information
+without putting language behavior in the core. `le_analyze_regions` accepts a
+grapheme-aligned, contiguous partition of non-empty text, routes each region
+independently, and merges provider output into one document-relative analysis.
+Region confidence and language tags are preserved. Empty text requires an empty
+partition. Automatic language detection is not implemented. The complete
+provider contract is documented in the
 [provider plugin ABI](provider-plugin-abi.md).
 
 ## Analysis representation
 
-`le_analyze` runs the routed provider independently of reading and presentation
-stages. An analysis owns an immutable source-text snapshot plus four contiguous
-arrays:
+`le_analyze` runs one routed provider independently of reading and presentation
+stages. `le_analyze_regions` performs the same operation for each explicit
+language region and merges the results. An analysis owns an immutable
+source-text snapshot plus four contiguous arrays:
 
 - nodes, with stable node identifiers and UTF-8 byte spans;
 - flattened child identifiers addressed by each node's child range;

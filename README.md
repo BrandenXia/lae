@@ -4,7 +4,7 @@ LAE is an early language-aware typographic emphasis runtime. The current
 milestone provides a stable C ABI, a validated and inspectable linguistic IR,
 a generic Unicode fallback, statically linked rule-based English, Chinese, and
 Japanese providers, a stable C provider plugin ABI, prefix and lexical-core reading
-models, and binary or
+models, explicit mixed-language analysis regions, and binary or
 variable-strength presentation. Versioned `.lem` artifacts can now carry model
 parameters and capability metadata into the memory-based runtime loader. An
 independent standard-library Python package can validate offline datasets,
@@ -37,7 +37,7 @@ cmake --install build --prefix "$PWD/install"
 ```
 
 ```cmake
-find_package(le 0.11 CONFIG REQUIRED)
+find_package(le 0.12 CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE le::runtime)
 ```
 

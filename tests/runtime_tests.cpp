@@ -279,6 +279,67 @@ void contract_tests() {
                      le_string_view_t{nullptr, 0}, &analysis) == LE_ERROR_INVALID_UTF8,
           "analysis rejects invalid UTF-8");
 
+    {
+        const std::string mixed = "unbelievable 日本語を 研究";
+        le_signal_result_t* mixed_signal_result = nullptr;
+        const le_language_region_t regions[] = {
+            {le_text_span_t{0, 13}, le_string_view_t{"en", 2}, 1.0F, 0},
+            {le_text_span_t{13, 26}, le_string_view_t{"ja", 2}, 0.9F, 0},
+            {le_text_span_t{26, 32}, le_string_view_t{"zh-Hans", 7}, 0.8F, 0},
+        };
+        check(le_analyze_regions(runtime, le_string_view_t{mixed.data(), mixed.size()}, regions, 3,
+                                 &analysis) == LE_OK,
+              "explicit language regions produce one analysis");
+        check(le_analysis_language_region_count(analysis) == 3,
+              "mixed analysis preserves explicit regions");
+        const auto* mixed_regions = le_analysis_language_region_data(analysis);
+        check(mixed_regions[1].span.begin == 13 && mixed_regions[1].span.end == 26 &&
+                  mixed_regions[1].confidence == 0.9F,
+              "mixed analysis preserves region spans and confidence");
+        check(le_generate_lexical_core_signals(runtime, analysis, &mixed_signal_result) == LE_OK,
+              "merged mixed-language analysis feeds existing reading models");
+        check(le_signal_result_count(mixed_signal_result) == 3,
+              "each language provider contributes a lexical core");
+        const auto* mixed_signals = le_signal_result_data(mixed_signal_result);
+        check(mixed_signals[0].span.begin == 2 && mixed_signals[0].span.end == 8,
+              "English mixed-region offsets are document-relative");
+        check(mixed_signals[1].span.begin == 13 && mixed_signals[1].span.end == 22,
+              "Japanese mixed-region offsets are document-relative");
+        check(mixed_signals[2].span.begin == 26 && mixed_signals[2].span.end == 32,
+              "Chinese mixed-region offsets are document-relative");
+        le_signal_result_destroy(mixed_signal_result);
+        le_analysis_destroy(analysis);
+        analysis = nullptr;
+
+        const le_language_region_t gap[] = {
+            {le_text_span_t{0, 13}, le_string_view_t{"en", 2}, 1.0F, 0},
+            {le_text_span_t{14, 32}, le_string_view_t{"ja", 2}, 1.0F, 0},
+        };
+        check(le_analyze_regions(runtime, le_string_view_t{mixed.data(), mixed.size()}, gap, 2,
+                                 &analysis) == LE_ERROR_INVALID_ARGUMENT,
+              "mixed-language partitions reject gaps");
+        check(analysis == nullptr, "invalid mixed-language partition clears output");
+
+        const le_language_region_t split_grapheme[] = {
+            {le_text_span_t{0, 14}, le_string_view_t{"en", 2}, 1.0F, 0},
+            {le_text_span_t{14, 32}, le_string_view_t{"ja", 2}, 1.0F, 0},
+        };
+        check(le_analyze_regions(runtime, le_string_view_t{mixed.data(), mixed.size()},
+                                 split_grapheme, 2, &analysis) == LE_ERROR_INVALID_ARGUMENT,
+              "mixed-language partitions reject split graphemes");
+        check(le_analyze_regions(runtime, le_string_view_t{mixed.data(), mixed.size()}, nullptr, 1,
+                                 &analysis) == LE_ERROR_INVALID_ARGUMENT,
+              "mixed-language analysis rejects a null region array");
+        check(le_analyze_regions(runtime, le_string_view_t{nullptr, 0}, nullptr, 0, &analysis) ==
+                  LE_OK,
+              "empty text accepts an empty language-region partition");
+        check(le_analysis_node_count(analysis) == 1 &&
+                  le_analysis_language_region_count(analysis) == 0,
+              "empty mixed-language analysis contains only its document root");
+        le_analysis_destroy(analysis);
+        analysis = nullptr;
+    }
+
     check(le_analysis_node_count(nullptr) == 0, "null analysis node count is zero");
     check(le_analysis_node_data(nullptr) == nullptr, "null analysis node data is null");
     check(le_analysis_child_count(nullptr) == 0, "null analysis child count is zero");
@@ -368,6 +429,23 @@ void static_provider_tests() {
     check(le_analysis_feature_data(analysis)[0].id == LE_FEATURE_RANGE_VENDOR_BEGIN,
           "static provider vendor feature is preserved");
     le_analysis_destroy(analysis);
+
+    {
+        const std::string mixed = "static reading";
+        const le_language_region_t regions[] = {
+            {le_text_span_t{0, 7}, le_string_view_t{"xs", 2}, 1.0F, 0},
+            {le_text_span_t{7, 14}, le_string_view_t{"en", 2}, 1.0F, 0},
+        };
+        analysis = nullptr;
+        check(le_analyze_regions(runtime, le_string_view_t{mixed.data(), mixed.size()}, regions, 2,
+                                 &analysis) == LE_OK,
+              "mixed-language routing includes registered providers");
+        check(le_analysis_language_region_count(analysis) == 2,
+              "registered-provider mixed analysis preserves both regions");
+        check(le_analysis_feature_data(analysis)[1].id == LE_FEATURE_RANGE_VENDOR_BEGIN,
+              "registered-provider features survive mixed-analysis merging");
+        le_analysis_destroy(analysis);
+    }
 
     le_provider_v1_t invalid_provider{};
     invalid_provider.struct_size = LE_PROVIDER_V1_SIZE;

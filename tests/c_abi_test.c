@@ -15,10 +15,12 @@ _Static_assert(LE_PROCESS_OPTIONS_V1_SIZE == offsetof(le_process_options_t, pres
                "v1 process options size changed");
 _Static_assert(LE_PROCESS_OPTIONS_V2_SIZE == offsetof(le_process_options_t, reading_model),
                "v2 process options size changed");
-_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 8u), "unexpected ABI version");
+_Static_assert(LE_ABI_VERSION == ((1u << 16u) | 9u), "unexpected ABI version");
 _Static_assert(LE_PROVIDER_ABI_VERSION == (1u << 16u), "unexpected provider ABI version");
 _Static_assert(LE_FEATURE_SCRIPT_HIRAGANA == 0x00040003u, "unexpected hiragana feature");
 _Static_assert(LE_FEATURE_SCRIPT_KATAKANA == 0x00040004u, "unexpected katakana feature");
+_Static_assert(sizeof(le_language_region_t) >= sizeof(le_text_span_t) + sizeof(le_string_view_t),
+               "language region ABI layout changed");
 
 static const uint8_t lexical_model_fixture[] = {
     0x4c, 0x41, 0x45, 0x4d, 0x4f, 0x44, 0x4c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
@@ -74,6 +76,7 @@ int main(void) {
     le_analysis_t* analysis = NULL;
     le_analysis_t* english_analysis = NULL;
     le_analysis_t* chinese_analysis = NULL;
+    le_analysis_t* mixed_analysis = NULL;
     le_signal_result_t* signals = NULL;
     le_signal_result_t* lexical_signals = NULL;
     le_signal_result_t* chinese_signals = NULL;
@@ -185,6 +188,16 @@ int main(void) {
           LE_ERROR_UNSUPPORTED_LANGUAGE);
     CHECK(model_signals == NULL);
 
+    {
+        const le_language_region_t mixed_regions[] = {
+            {{0, 6}, {"en", 2}, 1.0F, 0},
+            {{6, sizeof(input) - 1}, {"zh", 2}, 1.0F, 0},
+        };
+        CHECK(le_analyze_regions(runtime, (le_string_view_t){input, sizeof(input) - 1},
+                                 mixed_regions, 2, &mixed_analysis) == LE_OK);
+        CHECK(le_analysis_language_region_count(mixed_analysis) == 2);
+    }
+
     model_config.strategy = LE_PREFIX_FIXED;
     model_config.fixed_graphemes = 2;
     CHECK(le_generate_prefix_signals(runtime, analysis, &model_config, &signals) == LE_OK);
@@ -281,6 +294,7 @@ int main(void) {
     le_signal_result_destroy(signals);
     le_analysis_destroy(english_analysis);
     le_analysis_destroy(chinese_analysis);
+    le_analysis_destroy(mixed_analysis);
     le_analysis_destroy(analysis);
     le_result_destroy(result);
     le_result_destroy(model_result);

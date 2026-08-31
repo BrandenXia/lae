@@ -29,6 +29,11 @@ single-parent tree, sibling spans overlap, spans split graphemes, features are
 duplicated or non-finite, or language regions overlap or have invalid
 confidence. This ensures downstream models consume one coherent contract.
 
+An explicit mixed-language analysis contains one ordered language region for
+each caller-supplied partition element. Provider nodes remain generic and are
+merged under the document root with document-relative spans, so existing
+reading models consume single- and mixed-language analyses identically.
+
 The stable features defined through ABI 1.8 are:
 
 | Identifier | Meaning |

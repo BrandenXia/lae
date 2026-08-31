@@ -20,6 +20,12 @@ The core enforces these rules after every provider call. Providers may build
 their analysis however they prefer, but invalid graphs never reach reading
 models or the public analysis handle.
 
+`le_analyze_regions` routes each caller-supplied language slice through this
+same contract. The runtime validates the full partition before invoking any
+provider, rebases accepted slice-local spans into document byte coordinates,
+and validates the merged tree again. Providers therefore need no special
+mixed-document mode.
+
 The generic provider is always available as fallback and makes no morphology
 claims. Concrete implementations live under `runtime/providers`; English keeps
 token and affix rules there, Chinese keeps Han ranges, segmentation, and its
@@ -27,8 +33,9 @@ compact lexicon there, and Japanese keeps script and suffix rules there.
 External NLP libraries must likewise be wrapped
 inside concrete providers; the runtime core may not depend on them.
 
-English, Chinese, and Japanese exercise different structures through this contract. The
-public provider ABI v1 now exposes an equivalent C-only, sink-based boundary.
+English, Chinese, and Japanese exercise different structures through this
+contract. The public provider ABI v1 now exposes an equivalent C-only,
+sink-based boundary.
 The runtime owns sink storage and validates the completed graph before it
 reaches a model. Providers can be registered statically on every target or
 loaded from modules when that optional build capability is enabled. See the

@@ -198,6 +198,105 @@ le::core::Analysis analyze_with_runtime(le_runtime& runtime, const le::core::Tex
     return le::core::analyze(text, language);
 }
 
+le_status_t validate_explicit_regions(const le::core::Text& text,
+                                      const le_language_region_t* regions,
+                                      std::size_t region_count) {
+    if (regions == nullptr && region_count != 0) {
+        return invalid_argument("regions is null while region_count is nonzero");
+    }
+    if (text.bytes().empty()) {
+        return region_count == 0
+                   ? LE_OK
+                   : invalid_argument("empty text requires an empty language-region partition");
+    }
+    if (region_count == 0) {
+        return invalid_argument("non-empty text requires at least one language region");
+    }
+
+    std::uint64_t previous_end = 0;
+    for (std::size_t index = 0; index < region_count; ++index) {
+        const auto& region = regions[index];
+        if (region.span.begin != previous_end || region.span.end <= region.span.begin ||
+            region.span.end > text.bytes().size()) {
+            return invalid_argument(
+                "language regions must be non-empty and cover the text contiguously");
+        }
+        if (!text.is_valid_span(le::core::TextSpan(le::core::ByteOffset(region.span.begin),
+                                                   le::core::ByteOffset(region.span.end)),
+                                le::core::SpanBoundary::grapheme)) {
+            return invalid_argument("language region boundaries must align to graphemes");
+        }
+        if (region.language.size == 0 || !valid_language(region.language)) {
+            return invalid_argument("region language must be a non-empty BCP-47-compatible tag");
+        }
+        if (!std::isfinite(region.confidence) || region.confidence < 0.0F ||
+            region.confidence > 1.0F) {
+            return invalid_argument("region confidence must be finite and in [0, 1]");
+        }
+        if (region.reserved != 0) {
+            return invalid_argument("language region contains unsupported reserved fields");
+        }
+        previous_end = region.span.end;
+    }
+    if (previous_end != text.bytes().size()) {
+        return invalid_argument("language regions must cover the complete text");
+    }
+    return LE_OK;
+}
+
+le::core::Analysis analyze_explicit_regions(le_runtime& runtime, const le::core::Text& text,
+                                            const le_language_region_t* regions,
+                                            std::size_t region_count) {
+    le::core::Analysis result;
+    result.nodes.push_back(le::core::Node{
+        le::core::NodeId(0),
+        le::core::TextSpan(le::core::ByteOffset(0), le::core::ByteOffset(text.bytes().size())),
+        le::core::NodeKind::document,
+        {},
+        {le::core::Feature{le::core::feature_grapheme_count,
+                           static_cast<float>(text.graphemes().size())}},
+    });
+
+    for (std::size_t region_index = 0; region_index < region_count; ++region_index) {
+        const auto& region = regions[region_index];
+        const auto region_begin = static_cast<std::size_t>(region.span.begin);
+        const auto region_size = static_cast<std::size_t>(region.span.end - region.span.begin);
+        const auto region_bytes = text.bytes().substr(region_begin, region_size);
+        const le::core::Text region_text(region_bytes);
+        const auto language = language_view(region.language);
+        auto source = analyze_with_runtime(runtime, region_text, language);
+        le::core::validate_analysis(region_text, source);
+
+        constexpr auto maximum_node_id = std::numeric_limits<std::uint32_t>::max();
+        if (source.nodes.size() - 1 > maximum_node_id - (result.nodes.size() - 1)) {
+            throw std::length_error("mixed-language analysis exceeds node identifier capacity");
+        }
+        const auto node_shift = static_cast<std::uint32_t>(result.nodes.size() - 1);
+        for (const auto child : source.nodes.front().children) {
+            result.nodes.front().children.push_back(le::core::NodeId(child.value() + node_shift));
+        }
+        for (std::size_t node_index = 1; node_index < source.nodes.size(); ++node_index) {
+            auto node = std::move(source.nodes[node_index]);
+            node.id = le::core::NodeId(node.id.value() + node_shift);
+            node.span = le::core::TextSpan(
+                le::core::ByteOffset(node.span.begin().value() + region.span.begin),
+                le::core::ByteOffset(node.span.end().value() + region.span.begin));
+            for (auto& child : node.children) {
+                child = le::core::NodeId(child.value() + node_shift);
+            }
+            result.nodes.push_back(std::move(node));
+        }
+        result.language_regions.push_back(le::core::LanguageRegion{
+            le::core::TextSpan(le::core::ByteOffset(region.span.begin),
+                               le::core::ByteOffset(region.span.end)),
+            std::string(language),
+            region.confidence,
+        });
+    }
+    le::core::validate_analysis(text, result);
+    return result;
+}
+
 bool model_supports_analysis_languages(const le::model::Artifact& model,
                                        const le::core::Analysis& analysis) {
     return std::ranges::all_of(analysis.language_regions,
@@ -633,6 +732,53 @@ le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text, le_string_v
         return LE_ERROR_INTERNAL;
     } catch (...) {
         set_error("unexpected failure while analyzing text");
+        return LE_ERROR_INTERNAL;
+    }
+}
+
+le_status_t le_analyze_regions(le_runtime_t* runtime, le_string_view_t text,
+                               const le_language_region_t* regions, size_t region_count,
+                               le_analysis_t** out_analysis) {
+    if (out_analysis == nullptr) {
+        return invalid_argument("out_analysis is null");
+    }
+    *out_analysis = nullptr;
+    if (runtime == nullptr) {
+        return invalid_argument("runtime is null");
+    }
+    if (!valid_view(text)) {
+        return invalid_argument("text data is null while text size is nonzero");
+    }
+    if (text.size > std::numeric_limits<std::uint64_t>::max()) {
+        return invalid_argument("text is too large for 64-bit byte offsets");
+    }
+
+    try {
+        const std::string_view bytes =
+            text.size == 0 ? std::string_view{} : std::string_view(text.data, text.size);
+        const le::core::Text core_text(bytes);
+        const auto regions_status = validate_explicit_regions(core_text, regions, region_count);
+        if (regions_status != LE_OK) {
+            return regions_status;
+        }
+        auto core_analysis = analyze_explicit_regions(*runtime, core_text, regions, region_count);
+        auto analysis = make_analysis(std::move(core_analysis), bytes);
+        *out_analysis = analysis.release();
+        return LE_OK;
+    } catch (const le::plugin::Error& error) {
+        set_error(error.what());
+        return error.status();
+    } catch (const le::core::InvalidUtf8& error) {
+        set_error(error.what());
+        return LE_ERROR_INVALID_UTF8;
+    } catch (const std::bad_alloc&) {
+        set_error("could not allocate mixed-language analysis result");
+        return LE_ERROR_OUT_OF_MEMORY;
+    } catch (const std::exception& error) {
+        set_error(error.what());
+        return LE_ERROR_INTERNAL;
+    } catch (...) {
+        set_error("unexpected failure while analyzing language regions");
         return LE_ERROR_INTERNAL;
     }
 }

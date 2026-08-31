@@ -32,6 +32,11 @@ External providers use a stable C sink ABI; they never expose their allocator or
 C++ types to the core. The core owns the resulting storage and provider-neutral
 contract, but contains no English, Chinese, or Japanese analysis rules.
 
+Advanced callers can provide a contiguous, grapheme-aligned language-region
+partition. Each slice is routed independently, then its provider-neutral nodes
+are shifted into document coordinates and merged under one validated root.
+Region detection remains outside the runtime.
+
 The generic provider groups maximal runs of grapheme clusters separated by
 Unicode separator, control, or punctuation categories. This is only a fallback
 segmentation strategy. It is deliberately not whitespace tokenization and does
@@ -109,7 +114,7 @@ candidate-minus-baseline deltas. No evaluation code is linked into the runtime.
 
 The C ABI exposes immutable flat views of nodes, child identifiers, features,
 and language regions. Provider ABI v1 supports static registration everywhere
-and optional module loading on supported hosts. Mixed-language routing and
+and optional module loading on supported hosts. Automatic language detection and
 streaming remain deferred. English, Chinese, and Japanese exercise structurally
 different uses of the same provider-neutral IR.
 

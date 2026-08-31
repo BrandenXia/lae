@@ -8,6 +8,23 @@ model artifact format.
 
 No changes yet.
 
+## [0.12.0] - 2026-08-30
+
+### Added
+
+- Explicit mixed-language analysis through `le_analyze_regions`, with strict
+  contiguous coverage, grapheme-aligned boundaries, per-region provider
+  routing, and one merged provider-neutral IR.
+
+### Compatibility
+
+- Runtime version: 0.12.0.
+- C ABI: 1.9.
+- Provider ABI: 1.0.
+- Model artifact format: 1.0.
+- Python runtime binding: 0.12.0.
+- Python training package: 0.4.0.
+
 ## [0.11.0] - 2026-08-30
 
 ### Added

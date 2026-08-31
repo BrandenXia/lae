@@ -113,6 +113,17 @@ LE_API const le_feature_id_t* le_model_required_feature_data(const le_model_t* m
 LE_API le_status_t le_analyze(le_runtime_t* runtime, le_string_view_t text,
                               le_string_view_t language, le_analysis_t** out_analysis);
 
+/*
+ * Analyze one UTF-8 document through an explicit, contiguous language-region
+ * partition. Regions and their language views are borrowed only for this call.
+ * Non-empty text requires at least one non-empty, grapheme-aligned region;
+ * regions must cover the text exactly in ascending order. The caller owns
+ * out_analysis.
+ */
+LE_API le_status_t le_analyze_regions(le_runtime_t* runtime, le_string_view_t text,
+                                      const le_language_region_t* regions, size_t region_count,
+                                      le_analysis_t** out_analysis);
+
 /* Analysis accessors return immutable arrays borrowed until analysis destruction. */
 LE_API size_t le_analysis_node_count(const le_analysis_t* analysis);
 LE_API const le_analysis_node_t* le_analysis_node_data(const le_analysis_t* analysis);

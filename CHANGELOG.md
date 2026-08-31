@@ -8,6 +8,24 @@ model artifact format.
 
 No changes yet.
 
+## [0.13.1] - 2026-08-31
+
+### Improved
+
+- Japanese analysis now decomposes recognized causative, passive, progressive,
+  polite, negative, and past endings into stable grammatical subunits.
+- Productive `やすい` and `にくい` forms now distinguish their derivational
+  suffix from following adjective inflections.
+
+### Compatibility
+
+- Runtime version: 0.13.1.
+- C ABI: 1.10 (unchanged).
+- Provider ABI: 1.0 (unchanged).
+- Model artifact format: 1.0 (unchanged).
+- Python runtime binding: 0.13.1.
+- Python training package: 0.4.0 (unchanged).
+
 ## [0.13.0] - 2026-08-31
 
 ### Added

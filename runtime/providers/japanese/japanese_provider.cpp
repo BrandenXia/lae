@@ -46,22 +46,217 @@ struct SuffixRule {
     bool standalone;
 };
 
-constexpr std::array suffixes{
-    SuffixRule{"させられました", feature_grammatical_affix, true},
-    SuffixRule{"ませんでした", feature_grammatical_affix, true},
-    SuffixRule{"していました", feature_grammatical_affix, true},
-    SuffixRule{"させられる", feature_grammatical_affix, true},
-    SuffixRule{"られました", feature_grammatical_affix, true},
-    SuffixRule{"しています", feature_grammatical_affix, true},
-    SuffixRule{"させました", feature_grammatical_affix, true},
-    SuffixRule{"しません", feature_grammatical_affix, true},
-    SuffixRule{"られる", feature_grammatical_affix, true},
-    SuffixRule{"しました", feature_grammatical_affix, true},
-    SuffixRule{"でした", feature_grammatical_affix, true},
-    SuffixRule{"ません", feature_grammatical_affix, true},
-    SuffixRule{"ました", feature_grammatical_affix, true},
-    SuffixRule{"やすい", feature_derivational_affix, false},
-    SuffixRule{"にくい", feature_derivational_affix, false},
+struct SuffixPart {
+    std::string_view text;
+    FeatureId feature;
+};
+
+struct ChainedSuffixRule {
+    std::string_view text;
+    const SuffixPart* parts;
+    std::size_t part_count;
+    bool standalone;
+};
+
+template <std::size_t Size>
+constexpr ChainedSuffixRule chained_rule(std::string_view text,
+                                         const std::array<SuffixPart, Size>& parts,
+                                         bool standalone = true) {
+    return ChainedSuffixRule{text, parts.data(), Size, standalone};
+}
+
+constexpr std::array causative_passive_polite_past{
+    SuffixPart{"させ", feature_grammatical_affix},
+    SuffixPart{"られ", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array negative_polite_past{
+    SuffixPart{"ませ", feature_grammatical_affix},
+    SuffixPart{"ん", feature_grammatical_affix},
+    SuffixPart{"でし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array suru_negative_polite_past{
+    SuffixPart{"し", feature_grammatical_affix}, SuffixPart{"ませ", feature_grammatical_affix},
+    SuffixPart{"ん", feature_grammatical_affix}, SuffixPart{"でし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array progressive_polite_past{
+    SuffixPart{"し", feature_grammatical_affix}, SuffixPart{"て", feature_grammatical_affix},
+    SuffixPart{"い", feature_grammatical_affix}, SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array causative_passive{
+    SuffixPart{"させ", feature_grammatical_affix},
+    SuffixPart{"られ", feature_grammatical_affix},
+    SuffixPart{"る", feature_grammatical_affix},
+};
+constexpr std::array passive_polite_past{
+    SuffixPart{"られ", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array consonant_passive_polite_past{
+    SuffixPart{"れ", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array progressive_polite{
+    SuffixPart{"し", feature_grammatical_affix},
+    SuffixPart{"て", feature_grammatical_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+    SuffixPart{"ます", feature_grammatical_affix},
+};
+constexpr std::array causative_polite_past{
+    SuffixPart{"させ", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array consonant_causative_polite_past{
+    SuffixPart{"せ", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array generic_progressive_polite_past{
+    SuffixPart{"て", feature_grammatical_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array negative_polite{
+    SuffixPart{"し", feature_grammatical_affix},
+    SuffixPart{"ませ", feature_grammatical_affix},
+    SuffixPart{"ん", feature_grammatical_affix},
+};
+constexpr std::array passive{
+    SuffixPart{"られ", feature_grammatical_affix},
+    SuffixPart{"る", feature_grammatical_affix},
+};
+constexpr std::array consonant_passive{
+    SuffixPart{"れ", feature_grammatical_affix},
+    SuffixPart{"る", feature_grammatical_affix},
+};
+constexpr std::array polite_past{
+    SuffixPart{"し", feature_grammatical_affix},
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array generic_progressive_polite{
+    SuffixPart{"て", feature_grammatical_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+    SuffixPart{"ます", feature_grammatical_affix},
+};
+constexpr std::array progressive_past{
+    SuffixPart{"て", feature_grammatical_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array progressive{
+    SuffixPart{"て", feature_grammatical_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+    SuffixPart{"る", feature_grammatical_affix},
+};
+constexpr std::array copula_past{
+    SuffixPart{"でし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array generic_negative_polite{
+    SuffixPart{"ませ", feature_grammatical_affix},
+    SuffixPart{"ん", feature_grammatical_affix},
+};
+constexpr std::array generic_polite_past{
+    SuffixPart{"まし", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array negative_past{
+    SuffixPart{"なかっ", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array easy_past{
+    SuffixPart{"やす", feature_derivational_affix},
+    SuffixPart{"かっ", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array difficult_past{
+    SuffixPart{"にく", feature_derivational_affix},
+    SuffixPart{"かっ", feature_grammatical_affix},
+    SuffixPart{"た", feature_grammatical_affix},
+};
+constexpr std::array easy_negative{
+    SuffixPart{"やす", feature_derivational_affix},
+    SuffixPart{"く", feature_grammatical_affix},
+    SuffixPart{"ない", feature_grammatical_affix},
+};
+constexpr std::array difficult_negative{
+    SuffixPart{"にく", feature_derivational_affix},
+    SuffixPart{"く", feature_grammatical_affix},
+    SuffixPart{"ない", feature_grammatical_affix},
+};
+constexpr std::array easy{
+    SuffixPart{"やす", feature_derivational_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+};
+constexpr std::array difficult{
+    SuffixPart{"にく", feature_derivational_affix},
+    SuffixPart{"い", feature_grammatical_affix},
+};
+
+// Specific chains precede their overlapping shorter endings.
+constexpr std::array chained_suffixes{
+    chained_rule("させられました", causative_passive_polite_past),
+    chained_rule("しませんでした", suru_negative_polite_past),
+    chained_rule("ませんでした", negative_polite_past),
+    chained_rule("していました", progressive_polite_past),
+    chained_rule("させられる", causative_passive),
+    chained_rule("られました", passive_polite_past),
+    chained_rule("れました", consonant_passive_polite_past),
+    chained_rule("しています", progressive_polite),
+    chained_rule("させました", causative_polite_past),
+    chained_rule("せました", consonant_causative_polite_past),
+    chained_rule("ていました", generic_progressive_polite_past),
+    chained_rule("やすくない", easy_negative, false),
+    chained_rule("にくくない", difficult_negative, false),
+    chained_rule("やすかった", easy_past, false),
+    chained_rule("にくかった", difficult_past, false),
+    chained_rule("しません", negative_polite),
+    chained_rule("られる", passive),
+    chained_rule("れる", consonant_passive),
+    chained_rule("しました", polite_past),
+    chained_rule("ています", generic_progressive_polite),
+    chained_rule("なかった", negative_past),
+    chained_rule("ていた", progressive_past),
+    chained_rule("ている", progressive),
+    chained_rule("でした", copula_past),
+    chained_rule("ません", generic_negative_polite),
+    chained_rule("ました", generic_polite_past),
+    chained_rule("やすい", easy, false),
+    chained_rule("にくい", difficult, false),
+};
+
+constexpr bool valid_chained_suffix(const ChainedSuffixRule& suffix) {
+    std::size_t offset = 0;
+    for (std::size_t index = 0; index < suffix.part_count; ++index) {
+        const auto part = suffix.parts[index].text;
+        if (offset + part.size() > suffix.text.size() ||
+            suffix.text.substr(offset, part.size()) != part) {
+            return false;
+        }
+        offset += part.size();
+    }
+    return offset == suffix.text.size();
+}
+
+static_assert([] {
+    for (const auto& suffix : chained_suffixes) {
+        if (!valid_chained_suffix(suffix)) {
+            return false;
+        }
+    }
+    return true;
+}());
+
+constexpr std::array simple_suffixes{
     SuffixRule{"から", feature_grammatical_affix, true},
     SuffixRule{"まで", feature_grammatical_affix, true},
     SuffixRule{"より", feature_grammatical_affix, true},
@@ -202,7 +397,43 @@ UnitSpec make_unit(const Text& text, std::size_t begin, std::size_t end) {
     const auto byte_end = static_cast<std::size_t>(graphemes[end - 1].span.end().value());
     const auto unit_text = text.bytes().substr(byte_begin, byte_end - byte_begin);
 
-    for (const auto& suffix : suffixes) {
+    for (const auto& suffix : chained_suffixes) {
+        if (!unit_text.ends_with(suffix.text)) {
+            continue;
+        }
+        const auto suffix_byte = byte_end - suffix.text.size();
+        const auto suffix_begin = grapheme_at_byte(graphemes, begin, end, suffix_byte);
+        if (suffix_begin == end ||
+            (suffix_begin == begin &&
+             (!suffix.standalone || suffix.text.size() != unit_text.size()))) {
+            continue;
+        }
+
+        std::vector<SubunitSpec> subunits;
+        subunits.reserve(suffix.part_count + (suffix_begin == begin ? 0 : 1));
+        if (suffix_begin != begin) {
+            subunits.push_back(SubunitSpec{begin, suffix_begin, feature_lexical_core});
+        }
+
+        auto part_begin = suffix_begin;
+        auto part_byte_end = suffix_byte;
+        bool aligned = true;
+        for (std::size_t index = 0; index < suffix.part_count; ++index) {
+            part_byte_end += suffix.parts[index].text.size();
+            const auto part_end = grapheme_at_byte(graphemes, part_begin, end, part_byte_end);
+            if (part_end == end && part_byte_end != byte_end) {
+                aligned = false;
+                break;
+            }
+            subunits.push_back(SubunitSpec{part_begin, part_end, suffix.parts[index].feature});
+            part_begin = part_end;
+        }
+        if (aligned && part_byte_end == byte_end && part_begin == end) {
+            return UnitSpec{begin, end, std::move(subunits), 1.0F};
+        }
+    }
+
+    for (const auto& suffix : simple_suffixes) {
         if (!unit_text.ends_with(suffix.text)) {
             continue;
         }

@@ -74,19 +74,21 @@ int main() {
           "mixed Han and hiragana form one morphological unit");
     const auto& inflected = child(analysis, first_sentence, 0);
     check(children(text, analysis, inflected) ==
-              std::vector<std::string_view>{"食べ", "させられました"},
-          "longest grammatical suffix preserves the lexical core");
+              std::vector<std::string_view>{"食べ", "させ", "られ", "まし", "た"},
+          "inflection chain preserves the lexical core and grammatical structure");
     const auto& inflected_core = child(analysis, inflected, 0);
-    const auto& inflected_suffix = child(analysis, inflected, 1);
     check(has_feature(inflected_core, feature_lexical_core),
           "stem subunit carries lexical-core feature");
     check(has_feature(inflected_core, feature_script_han) &&
               has_feature(inflected_core, feature_script_hiragana),
           "mixed-script lexical core preserves both script facts");
-    check(has_feature(inflected_suffix, feature_grammatical_affix),
-          "inflection carries grammatical-affix feature");
-    check(has_feature(inflected_suffix, feature_script_hiragana),
-          "inflection carries hiragana feature");
+    for (std::size_t index = 1; index < inflected.children.size(); ++index) {
+        const auto& inflected_suffix = child(analysis, inflected, index);
+        check(has_feature(inflected_suffix, feature_grammatical_affix),
+              "each inflection-chain part carries grammatical-affix feature");
+        check(has_feature(inflected_suffix, feature_script_hiragana),
+              "each inflection-chain part carries hiragana feature");
+    }
 
     const auto& second_sentence = sentence(analysis, 1);
     check(children(text, analysis, second_sentence) ==
@@ -99,8 +101,8 @@ int main() {
           "particle carries grammatical feature");
     const auto& progressive = child(analysis, second_sentence, 1);
     check(children(text, analysis, progressive) ==
-              std::vector<std::string_view>{"研究", "しています"},
-          "auxiliary sequence is separated deterministically");
+              std::vector<std::string_view>{"研究", "し", "て", "い", "ます"},
+          "auxiliary sequence is decomposed deterministically");
     check(has_feature(progressive, feature_content_unit),
           "unit containing a lexical core is content-bearing");
     check(has_feature(progressive, feature_segmentation_confidence),
@@ -137,6 +139,63 @@ int main() {
           "standalone copula is grammatical rather than lexical");
     check(!has_feature(copula, feature_content_unit),
           "standalone grammatical unit is not marked content-bearing");
+
+    const Text derivation("読みやすかった。読みにくくない。食べていました。行かなかった。");
+    const auto derivation_analysis = provider.analyze(derivation, "ja");
+    validate_analysis(derivation, derivation_analysis);
+    check(derivation_analysis.nodes.front().children.size() == 4,
+          "derivational sample creates four sentence nodes");
+
+    const auto& easy_form = child(derivation_analysis, sentence(derivation_analysis, 0), 0);
+    check(children(derivation, derivation_analysis, easy_form) ==
+              std::vector<std::string_view>{"読み", "やす", "かっ", "た"},
+          "derivational adjective and past inflection form separate layers");
+    check(has_feature(child(derivation_analysis, easy_form, 1), feature_derivational_affix),
+          "productivity suffix carries derivational-affix feature");
+    check(has_feature(child(derivation_analysis, easy_form, 2), feature_grammatical_affix) &&
+              has_feature(child(derivation_analysis, easy_form, 3), feature_grammatical_affix),
+          "derivational adjective endings carry grammatical-affix features");
+
+    const auto& difficult_form = child(derivation_analysis, sentence(derivation_analysis, 1), 0);
+    check(children(derivation, derivation_analysis, difficult_form) ==
+              std::vector<std::string_view>{"読み", "にく", "く", "ない"},
+          "derivational adjective and negative inflection form separate layers");
+    check(has_feature(child(derivation_analysis, difficult_form, 1), feature_derivational_affix),
+          "negative derivational form preserves the derivational feature");
+
+    const auto& generic_progressive =
+        child(derivation_analysis, sentence(derivation_analysis, 2), 0);
+    check(children(derivation, derivation_analysis, generic_progressive) ==
+              std::vector<std::string_view>{"食べ", "て", "い", "まし", "た"},
+          "generic progressive chain works without a suru stem");
+
+    const auto& negative_form = child(derivation_analysis, sentence(derivation_analysis, 3), 0);
+    check(children(derivation, derivation_analysis, negative_form) ==
+              std::vector<std::string_view>{"行か", "なかっ", "た"},
+          "negative past form exposes its inflection chain");
+
+    const Text conjugation("勉強しませんでした。読まれました。読ませました。");
+    const auto conjugation_analysis = provider.analyze(conjugation, "ja");
+    validate_analysis(conjugation, conjugation_analysis);
+    check(conjugation_analysis.nodes.front().children.size() == 3,
+          "conjugation sample creates three sentence nodes");
+
+    const auto& suru_negative = child(conjugation_analysis, sentence(conjugation_analysis, 0), 0);
+    check(children(conjugation, conjugation_analysis, suru_negative) ==
+              std::vector<std::string_view>{"勉強", "し", "ませ", "ん", "でし", "た"},
+          "suru negative polite past keeps the verbalizer grammatical");
+
+    const auto& consonant_passive =
+        child(conjugation_analysis, sentence(conjugation_analysis, 1), 0);
+    check(children(conjugation, conjugation_analysis, consonant_passive) ==
+              std::vector<std::string_view>{"読ま", "れ", "まし", "た"},
+          "consonant-stem passive exposes passive and polite-past layers");
+
+    const auto& consonant_causative =
+        child(conjugation_analysis, sentence(conjugation_analysis, 2), 0);
+    check(children(conjugation, conjugation_analysis, consonant_causative) ==
+              std::vector<std::string_view>{"読ま", "せ", "まし", "た"},
+          "consonant-stem causative exposes causative and polite-past layers");
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

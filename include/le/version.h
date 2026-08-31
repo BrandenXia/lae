@@ -9,6 +9,6 @@
 
 #define LE_VERSION_MAJOR 0u
 #define LE_VERSION_MINOR 13u
-#define LE_VERSION_PATCH 0u
+#define LE_VERSION_PATCH 1u
 
 #endif

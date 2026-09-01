@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(lae VERSION 0.15.0 LANGUAGES C CXX)
+project(lae VERSION 0.16.0 LANGUAGES C CXX)
 
 option(LAE_BUILD_CLI "Build the le-cli demonstration program" ON)
 option(LAE_BUILD_TESTS "Build the test suite" ON)
@@ -162,6 +162,13 @@ if(LAE_BUILD_TESTS)
         set_tests_properties(released-provo-model PROPERTIES
             PASS_REGULAR_EXPRESSION "linear-salience"
         )
+        add_test(NAME released-provo-segmental-model
+            COMMAND le-model inspect
+                    ${CMAKE_CURRENT_SOURCE_DIR}/models/lae-provo-segmental-v1.lem
+        )
+        set_tests_properties(released-provo-segmental-model PROPERTIES
+            PASS_REGULAR_EXPRESSION "segmental-salience"
+        )
     endif()
 
     add_executable(le-c11-abi-test tests/c_abi_test.c)
@@ -261,6 +268,18 @@ if(LAE_BUILD_TESTS)
         )
         set_tests_properties(example-provo-markdown PROPERTIES
             PASS_REGULAR_EXPRESSION "\\*\\*Language\\*\\*"
+        )
+        add_test(NAME example-segmental-markdown
+            COMMAND ${CMAKE_COMMAND} -E env
+                    PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/src
+                    ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/segmental_markdown.py
+                    --library $<TARGET_FILE:le_runtime>
+                    --model ${CMAKE_CURRENT_SOURCE_DIR}/models/lae-provo-segmental-v1.lem
+                    "Unbelievable readers reread internationalization documentation efficiently."
+        )
+        set_tests_properties(example-segmental-markdown PROPERTIES
+            PASS_REGULAR_EXPRESSION "Un\\*\\*believ\\*\\*able"
         )
     endif()
 
@@ -430,10 +449,14 @@ install(FILES
     models/lae-provo-fixation-v1.lem
     models/lae-provo-fixation-v1.json
     models/lae-provo-fixation-v1-NOTICE.txt
+    models/lae-provo-segmental-v1.lem
+    models/lae-provo-segmental-v1.json
+    models/lae-provo-segmental-v1-NOTICE.txt
     DESTINATION ${CMAKE_INSTALL_DATADIR}/lae/models
 )
 install(FILES
     docs/models/provo-fixation-v1.md
+    docs/models/provo-segmental-v1.md
     DESTINATION ${CMAKE_INSTALL_DOCDIR}/models
 )
 if(LAE_BUILD_CLI)

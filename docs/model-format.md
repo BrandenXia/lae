@@ -23,7 +23,7 @@ Format v1 uses this fixed 64-byte header:
 | 16 | 4 | total size | exact input-buffer size |
 | 20 | 4 | checksum | CRC-32/ISO-HDLC over the entire artifact with these four bytes treated as zero |
 | 24 | 4 | minimum ABI | packed `(major << 16) | minor` |
-| 28 | 4 | model type | `1` prefix, `2` lexical core, `3` linear salience |
+| 28 | 4 | model type | `1` prefix, `2` lexical core, `3` linear salience, `4` segmental salience |
 | 32 | 4 | model version | nonzero producer-defined version |
 | 36 | 4 | language count | at most 64 |
 | 40 | 4 | required-feature count | at most 256 |
@@ -70,6 +70,18 @@ required-feature table. Bias and weights must be finite. Linear artifacts must
 declare minimum ABI 1.6 or newer. The runtime evaluates
 the ordered binary32 weights against `unit` node features with a binary64
 accumulator and clamps the sum to `[0,1]`.
+
+Segmental-salience models contain `6 + 2N + 2M` words:
+
+1. salience bias and weight count `N`, followed by `N` feature/weight pairs;
+2. anchor bias and weight count `M`, followed by `M` feature/weight pairs;
+3. minimum highlighted grapheme count;
+4. reserved flags, currently zero.
+
+They must declare `LE_FEATURE_LEXICAL_CORE` and minimum ABI 1.12. The first
+regressor predicts unit fixation salience. The second predicts normalized
+within-unit landing progress. Runtime inference uses a strict lexical-core
+child when available and otherwise emits a grapheme-safe partial prefix.
 
 ## Validation and compatibility
 

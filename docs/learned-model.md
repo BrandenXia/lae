@@ -92,3 +92,13 @@ solver, dataset reader, Python, or checkpoints.
 The baseline deliberately excludes feature transforms, interactions, neural
 layers, and online adaptation. Future learned models can add new validated
 artifact types while preserving the same C processing APIs.
+
+## Segmental real-data model
+
+Version 0.16 adds `train-provo-segmental` and
+`LE_MODEL_SEGMENTAL_SALIENCE`. The trainer uses the Provo first-fixation X
+coordinate and word bounding box to learn normalized landing position in
+addition to word fixation probability. Runtime ABI 1.12 projects those outputs
+onto English lexical-core subunits or a learned partial prefix. See the
+[Provo segmental v1 model card](models/provo-segmental-v1.md) for held-out
+results and limitations.

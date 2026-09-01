@@ -305,6 +305,56 @@ bool model_supports_analysis_languages(const le::model::Artifact& model,
                                });
 }
 
+double predict_features(const le::core::Node& node, double bias,
+                        const std::vector<le::model::Artifact::FeatureWeight>& weights) {
+    auto prediction = bias;
+    for (const auto& learned_weight : weights) {
+        const auto feature =
+            std::ranges::find_if(node.features, [&](const le::core::Feature& item) {
+                return item.id == learned_weight.feature;
+            });
+        if (feature != node.features.end()) {
+            prediction +=
+                static_cast<double>(learned_weight.weight) * static_cast<double>(feature->value);
+        }
+    }
+    return prediction;
+}
+
+bool has_positive_feature(const le::core::Node& node, le::core::FeatureId id) {
+    return std::ranges::any_of(node.features, [=](const le::core::Feature& feature) {
+        return feature.id == id && feature.value > 0.0F;
+    });
+}
+
+le::core::TextSpan segmental_span(const le::core::Text& text, const le::core::Analysis& analysis,
+                                  const le::core::Node& unit, double anchor,
+                                  std::uint32_t minimum_graphemes) {
+    for (const auto child_id : unit.children) {
+        const auto& child = analysis.nodes[child_id.value()];
+        if (child.kind != le::core::NodeKind::subunit ||
+            !has_positive_feature(child, le::core::feature_lexical_core) ||
+            (child.span.begin() == unit.span.begin() && child.span.end() == unit.span.end())) {
+            continue;
+        }
+        if (text.graphemes_in(child.span).size() >= minimum_graphemes) {
+            return child.span;
+        }
+    }
+
+    const auto graphemes = text.graphemes_in(unit.span);
+    if (graphemes.empty()) {
+        return unit.span;
+    }
+    auto count = static_cast<std::size_t>(
+        std::ceil(std::clamp(anchor, 0.0, 1.0) * static_cast<double>(graphemes.size())));
+    count = std::max<std::size_t>(count, minimum_graphemes);
+    const auto maximum =
+        graphemes.size() > minimum_graphemes ? graphemes.size() - 1 : graphemes.size();
+    count = std::clamp<std::size_t>(count, 1, maximum);
+    return le::core::TextSpan(unit.span.begin(), graphemes[count - 1]->span.end());
+}
+
 std::vector<le::core::ReadingSignal> generate_model_signals(const le::core::Text& text,
                                                             const le::core::Analysis& analysis,
                                                             const le::model::Artifact& model) {
@@ -320,26 +370,23 @@ std::vector<le::core::ReadingSignal> generate_model_signals(const le::core::Text
     if (model.type == LE_MODEL_LEXICAL_CORE) {
         return le::core::LexicalCoreReadingModel().generate(analysis);
     }
-    if (model.type == LE_MODEL_LINEAR_SALIENCE) {
+    if (model.type == LE_MODEL_LINEAR_SALIENCE || model.type == LE_MODEL_SEGMENTAL_SALIENCE) {
         std::vector<le::core::ReadingSignal> signals;
         for (const auto& node : analysis.nodes) {
             if (node.kind != le::core::NodeKind::unit) {
                 continue;
             }
-            auto salience = static_cast<double>(model.linear_bias);
-            for (const auto& learned_weight : model.linear_weights) {
-                const auto feature =
-                    std::ranges::find_if(node.features, [&](const le::core::Feature& item) {
-                        return item.id == learned_weight.feature;
-                    });
-                if (feature != node.features.end()) {
-                    salience += static_cast<double>(learned_weight.weight) *
-                                static_cast<double>(feature->value);
-                }
-            }
+            const auto salience = predict_features(node, model.linear_bias, model.linear_weights);
             const auto normalized = static_cast<float>(std::clamp(salience, 0.0, 1.0));
             if (normalized > 0.0F) {
-                signals.push_back(le::core::ReadingSignal{node.span, normalized, normalized, 0.0F});
+                auto span = node.span;
+                if (model.type == LE_MODEL_SEGMENTAL_SALIENCE) {
+                    const auto anchor = predict_features(node, model.segmental_anchor_bias,
+                                                         model.segmental_anchor_weights);
+                    span = segmental_span(text, analysis, node, anchor,
+                                          model.segmental_minimum_graphemes);
+                }
+                signals.push_back(le::core::ReadingSignal{span, normalized, normalized, 0.0F});
             }
         }
         return signals;

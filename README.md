@@ -142,6 +142,8 @@ PYTHONPATH=training/src python3 -m lae_training fit-linear-salience \
 build/le-model inspect build/learned.lem
 printf 'unbelievable reading' | build/le-cli \
   --artifact build/learned.lem --language en --dump-signals
+PYTHONPATH=bindings/python/src python3 examples/segmental_markdown.py \
+  'Unbelievable readers reread internationalization documentation efficiently.'
 ```
 
 The CLI prints ordered, non-overlapping UTF-8 byte ranges or the provider's
@@ -164,6 +166,7 @@ See [architecture](docs/architecture.md), [C API](docs/c-api.md),
 [evaluation framework](docs/evaluation.md),
 [learned model](docs/learned-model.md),
 [Provo fixation v1 model card](docs/models/provo-fixation-v1.md),
+[Provo segmental v1 model card](docs/models/provo-segmental-v1.md),
 [provider plugin ABI](docs/provider-plugin-abi.md),
 [Python binding](docs/python-binding.md),
 [Swift binding](docs/swift-binding.md),

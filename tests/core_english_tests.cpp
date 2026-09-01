@@ -36,6 +36,11 @@ bool has_feature(const le::core::Node& node, le::core::FeatureId id, float value
     });
 }
 
+bool has_feature_id(const le::core::Node& node, le::core::FeatureId id) {
+    return std::ranges::any_of(node.features,
+                               [=](const le::core::Feature& feature) { return feature.id == id; });
+}
+
 } // namespace
 
 int main() {
@@ -63,6 +68,9 @@ int main() {
             ++units;
             check(has_feature(node, feature_segmentation_confidence),
                   "English tokenization has full segmentation confidence");
+            check(has_feature_id(node, feature_unit_position) &&
+                      has_feature_id(node, feature_sentence_unit_count),
+                  "English units expose sentence-local structural features");
             semantic_features.push_back(has_feature(node, feature_function_unit)
                                             ? feature_function_unit
                                             : feature_content_unit);
@@ -85,12 +93,12 @@ int main() {
 
     const std::vector<ExpectedSubunit> expected{
         {"Un", feature_derivational_affix},   {"believ", feature_lexical_core},
-        {"able", feature_derivational_affix}, {"reader", feature_lexical_core},
-        {"s", feature_grammatical_affix},     {"were", feature_lexical_core},
-        {"read", feature_lexical_core},       {"ing", feature_grammatical_affix},
-        {"Quick", feature_lexical_core},      {"ly", feature_derivational_affix},
-        {"re", feature_derivational_affix},   {"play", feature_lexical_core},
-        {"ed", feature_grammatical_affix},
+        {"able", feature_derivational_affix}, {"read", feature_lexical_core},
+        {"er", feature_grammatical_affix},    {"s", feature_grammatical_affix},
+        {"were", feature_lexical_core},       {"read", feature_lexical_core},
+        {"ing", feature_grammatical_affix},   {"Quick", feature_lexical_core},
+        {"ly", feature_derivational_affix},   {"re", feature_derivational_affix},
+        {"play", feature_lexical_core},       {"ed", feature_grammatical_affix},
     };
     check(subunits.size() == expected.size(), "morphology produces expected subunit count");
     const auto count = std::min(subunits.size(), expected.size());
@@ -142,6 +150,21 @@ int main() {
     }
     check(protected_subunits == std::vector<std::string_view>{"Under", "does"},
           "closed-class words are protected from coincidental affix matches");
+
+    const Text layered("rereading unhappiness internationalization mischaracterizations");
+    const auto layered_analysis = provider.analyze(layered, "en");
+    validate_analysis(layered, layered_analysis);
+    std::vector<std::string_view> layered_subunits;
+    for (const auto& node : layered_analysis.nodes) {
+        if (node.kind == NodeKind::subunit) {
+            layered_subunits.push_back(slice(layered, node));
+        }
+    }
+    check(layered_subunits == std::vector<std::string_view>{"re", "read", "ing", "un", "happi",
+                                                            "ness", "inter", "nation", "al",
+                                                            "ization", "mis", "character",
+                                                            "ization", "s"},
+          "layered morphology preserves ordered lexical and affix spans");
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

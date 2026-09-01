@@ -20,6 +20,8 @@
 
 namespace {
 
+constexpr std::uint32_t baseline_model_abi = (1U << 16U) | 11U;
+
 void usage(std::ostream& stream) {
     stream << "Usage:\n"
               "  le-model inspect FILE\n"
@@ -80,7 +82,10 @@ const char* type_name(std::uint32_t type) {
     if (type == LE_MODEL_PREFIX) {
         return "prefix";
     }
-    return type == LE_MODEL_LEXICAL_CORE ? "lexical-core" : "linear-salience";
+    if (type == LE_MODEL_LEXICAL_CORE) {
+        return "lexical-core";
+    }
+    return type == LE_MODEL_SEGMENTAL_SALIENCE ? "segmental-salience" : "linear-salience";
 }
 
 void inspect(const std::string& path) {
@@ -109,14 +114,26 @@ void inspect(const std::string& path) {
                   << (artifact.prefix_strategy == LE_PREFIX_FIXED ? "fixed" : "proportional")
                   << "\",\"fixed_graphemes\":" << artifact.fixed_graphemes
                   << ",\"proportion\":" << artifact.prefix_proportion << '}';
-    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE) {
+    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE ||
+               artifact.type == LE_MODEL_SEGMENTAL_SALIENCE) {
         std::cout << ",\n  \"parameters\":{\"bias\":" << artifact.linear_bias << ",\"weights\":[";
         for (std::size_t index = 0; index < artifact.linear_weights.size(); ++index) {
             const auto& item = artifact.linear_weights[index];
             std::cout << (index == 0 ? "" : ",") << "{\"feature\":" << item.feature
                       << ",\"weight\":" << item.weight << '}';
         }
-        std::cout << "]}";
+        std::cout << ']';
+        if (artifact.type == LE_MODEL_SEGMENTAL_SALIENCE) {
+            std::cout << ",\"anchor_bias\":" << artifact.segmental_anchor_bias
+                      << ",\"anchor_weights\":[";
+            for (std::size_t index = 0; index < artifact.segmental_anchor_weights.size(); ++index) {
+                const auto& item = artifact.segmental_anchor_weights[index];
+                std::cout << (index == 0 ? "" : ",") << "{\"feature\":" << item.feature
+                          << ",\"weight\":" << item.weight << '}';
+            }
+            std::cout << "],\"minimum_graphemes\":" << artifact.segmental_minimum_graphemes;
+        }
+        std::cout << '}';
     }
     std::cout << "\n}\n";
 }
@@ -127,7 +144,7 @@ void compile(int argc, char** argv, bool lexical_core) {
         std::exit(2);
     }
     le::model::Artifact artifact{
-        LE_ABI_VERSION,
+        baseline_model_abi,
         lexical_core ? LE_MODEL_LEXICAL_CORE : LE_MODEL_PREFIX,
         1,
         {},
@@ -138,6 +155,9 @@ void compile(int argc, char** argv, bool lexical_core) {
         0.5F,
         0.0F,
         {},
+        0.5F,
+        {},
+        1,
     };
     for (int index = 3; index < argc; ++index) {
         const std::string_view option(argv[index]);
@@ -179,7 +199,10 @@ void compile_linear_salience(int argc, char** argv) {
                                  1,
                                  0.5F,
                                  0.0F,
-                                 {}};
+                                 {},
+                                 0.5F,
+                                 {},
+                                 1};
     for (int index = 3; index < argc; ++index) {
         const std::string_view option(argv[index]);
         if (option == "--language" && index + 1 < argc) {

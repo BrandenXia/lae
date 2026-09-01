@@ -47,8 +47,11 @@ constexpr std::array prefixes{
 constexpr std::array suffixes{
     AffixRule{"ability", feature_derivational_affix},
     AffixRule{"ibility", feature_derivational_affix},
+    AffixRule{"ization", feature_derivational_affix},
+    AffixRule{"isation", feature_derivational_affix},
     AffixRule{"ation", feature_derivational_affix},
     AffixRule{"ition", feature_derivational_affix},
+    AffixRule{"ology", feature_derivational_affix},
     AffixRule{"ment", feature_derivational_affix},
     AffixRule{"ness", feature_derivational_affix},
     AffixRule{"less", feature_derivational_affix},
@@ -57,6 +60,10 @@ constexpr std::array suffixes{
     AffixRule{"ful", feature_derivational_affix},
     AffixRule{"ous", feature_derivational_affix},
     AffixRule{"ive", feature_derivational_affix},
+    AffixRule{"ism", feature_derivational_affix},
+    AffixRule{"ist", feature_derivational_affix},
+    AffixRule{"ize", feature_derivational_affix},
+    AffixRule{"ise", feature_derivational_affix},
     AffixRule{"est", feature_grammatical_affix},
     AffixRule{"ing", feature_grammatical_affix},
     AffixRule{"ed", feature_grammatical_affix},
@@ -65,6 +72,27 @@ constexpr std::array suffixes{
     AffixRule{"al", feature_derivational_affix},
     AffixRule{"s", feature_grammatical_affix},
 };
+
+constexpr std::array morphology_exceptions{
+    std::string_view("address"),   std::string_view("analysis"), std::string_view("business"),
+    std::string_view("character"), std::string_view("computer"), std::string_view("document"),
+    std::string_view("nation"),    std::string_view("number"),   std::string_view("other"),
+    std::string_view("paper"),     std::string_view("power"),    std::string_view("process"),
+    std::string_view("progress"),  std::string_view("proper"),   std::string_view("signal"),
+    std::string_view("success"),   std::string_view("summer"),   std::string_view("water"),
+    std::string_view("winter"),    std::string_view("witness"),
+};
+
+bool is_morphology_exception(std::string_view value) {
+    if (std::ranges::find(morphology_exceptions, value) != morphology_exceptions.end()) {
+        return true;
+    }
+    return std::ranges::any_of(prefixes, [&](std::string_view prefix) {
+        return value.starts_with(prefix) &&
+               std::ranges::find(morphology_exceptions, value.substr(prefix.size())) !=
+                   morphology_exceptions.end();
+    });
+}
 
 constexpr std::array contractions{
     std::string_view("n't"), std::string_view("n’t"), std::string_view("'re"),
@@ -198,53 +226,87 @@ std::vector<SubunitSpec> analyze_morphology(std::string_view token) {
         lower.find("’") == std::string::npos) {
         return {{0, token.size(), feature_lexical_core}};
     }
+    if (is_morphology_exception(lower)) {
+        return {{0, token.size(), feature_lexical_core}};
+    }
 
     std::size_t core_begin = 0;
     std::size_t core_end = lower.size();
-    std::vector<SubunitSpec> result;
+    std::vector<SubunitSpec> leading;
+    std::vector<SubunitSpec> trailing;
 
-    FeatureId suffix_feature = 0;
     const auto reduced_negative = lower == "can't" || lower == "can’t" || lower == "won't" ||
                                   lower == "won’t" || lower == "shan't" || lower == "shan’t";
     if (reduced_negative) {
         const auto suffix = lower.ends_with("’t") ? std::string_view("’t") : std::string_view("'t");
+        trailing.push_back({core_end - suffix.size(), core_end, feature_grammatical_affix});
         core_end -= suffix.size();
-        suffix_feature = feature_grammatical_affix;
     } else {
         for (const auto contraction : contractions) {
             if (ends_with(lower, contraction, core_end) &&
                 core_end - contraction.size() > core_begin) {
+                trailing.push_back(
+                    {core_end - contraction.size(), core_end, feature_grammatical_affix});
                 core_end -= contraction.size();
-                suffix_feature = feature_grammatical_affix;
-                break;
-            }
-        }
-    }
-    if (suffix_feature == 0) {
-        for (const auto& suffix : suffixes) {
-            if (ends_with(lower, suffix.text, core_end) &&
-                core_end - suffix.text.size() >= core_begin + 3) {
-                core_end -= suffix.text.size();
-                suffix_feature = suffix.feature;
                 break;
             }
         }
     }
 
-    for (const auto prefix : prefixes) {
-        const auto ambiguous_read = prefix == "re" && lower.starts_with("read");
-        if (!ambiguous_read && starts_with(lower, prefix, 0) && core_end - prefix.size() >= 3) {
-            core_begin = prefix.size();
+    for (std::size_t layer = 0; layer < 3; ++layer) {
+        if (is_morphology_exception(
+                std::string_view(lower).substr(core_begin, core_end - core_begin))) {
+            break;
+        }
+        bool matched = false;
+        for (const auto& suffix : suffixes) {
+            if (suffix.text == "s" && core_end >= 2 &&
+                (lower[core_end - 2] == 's' || lower[core_end - 2] == 'u' ||
+                 lower[core_end - 2] == 'i')) {
+                continue;
+            }
+            if (suffix.text == "er" && core_end - core_begin < 6) {
+                continue;
+            }
+            if (ends_with(lower, suffix.text, core_end) &&
+                core_end - suffix.text.size() >= core_begin + 3) {
+                trailing.push_back({core_end - suffix.text.size(), core_end, suffix.feature});
+                core_end -= suffix.text.size();
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
             break;
         }
     }
 
-    if (core_begin != 0) {
-        result.push_back({0, core_begin, feature_derivational_affix});
+    for (std::size_t layer = 0; layer < 3; ++layer) {
+        bool matched = false;
+        for (const auto prefix : prefixes) {
+            const auto ambiguous_read =
+                prefix == "re" &&
+                lower.substr(core_begin, core_end - core_begin).starts_with("read");
+            if (!ambiguous_read && starts_with(lower, prefix, core_begin) &&
+                core_end - core_begin - prefix.size() >= 3) {
+                leading.push_back(
+                    {core_begin, core_begin + prefix.size(), feature_derivational_affix});
+                core_begin += prefix.size();
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            break;
+        }
     }
+
+    std::vector<SubunitSpec> result;
+    result.reserve(leading.size() + trailing.size() + 1);
+    result.insert(result.end(), leading.begin(), leading.end());
     result.push_back({core_begin, core_end, feature_lexical_core});
-    if (core_end < lower.size()) {
-        result.push_back({core_end, lower.size(), suffix_feature});
+    for (auto item = trailing.rbegin(); item != trailing.rend(); ++item) {
+        result.push_back(*item);
     }
     return result;
 }
@@ -325,12 +387,17 @@ Analysis EnglishLanguageProvider::analyze(const Text& text, std::string_view lan
                                     {Feature{feature_boundary_strength, 1.0F}}});
         result.nodes.front().children.push_back(sentence_id);
 
-        for (const auto& token : sentence.tokens) {
+        for (std::size_t token_index = 0; token_index < sentence.tokens.size(); ++token_index) {
+            const auto& token = sentence.tokens[token_index];
             const auto unit_id = NodeId(static_cast<std::uint32_t>(result.nodes.size()));
             const auto token_begin = static_cast<std::size_t>(token.span.begin().value());
             const auto token_size =
                 static_cast<std::size_t>(token.span.end().value() - token.span.begin().value());
             const auto token_text = text.bytes().substr(token_begin, token_size);
+            const auto sentence_progress = sentence.tokens.size() <= 1
+                                               ? 0.0F
+                                               : static_cast<float>(token_index) /
+                                                     static_cast<float>(sentence.tokens.size() - 1);
             result.nodes.push_back(Node{
                 unit_id,
                 token.span,
@@ -338,6 +405,9 @@ Analysis EnglishLanguageProvider::analyze(const Text& text, std::string_view lan
                 {},
                 {Feature{feature_grapheme_count, static_cast<float>(token.grapheme_count)},
                  Feature{feature_segmentation_confidence, 1.0F},
+                 Feature{feature_unit_position, static_cast<float>(token_index + 1)},
+                 Feature{feature_sentence_progress, sentence_progress},
+                 Feature{feature_sentence_unit_count, static_cast<float>(sentence.tokens.size())},
                  Feature{is_function_unit(token_text) ? feature_function_unit
                                                       : feature_content_unit,
                          1.0F}},

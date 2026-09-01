@@ -104,6 +104,9 @@ bool known_feature(std::uint32_t feature) {
         std::uint32_t(LE_FEATURE_BOUNDARY_STRENGTH),
         std::uint32_t(LE_FEATURE_GRAPHEME_COUNT),
         std::uint32_t(LE_FEATURE_SEGMENTATION_CONFIDENCE),
+        std::uint32_t(LE_FEATURE_UNIT_POSITION),
+        std::uint32_t(LE_FEATURE_SENTENCE_PROGRESS),
+        std::uint32_t(LE_FEATURE_SENTENCE_UNIT_COUNT),
         std::uint32_t(LE_FEATURE_LEXICAL_CORE),
         std::uint32_t(LE_FEATURE_DERIVATIONAL_AFFIX),
         std::uint32_t(LE_FEATURE_GRAMMATICAL_AFFIX),
@@ -163,11 +166,24 @@ void validate_metadata(const Artifact& artifact) {
         features.push_back(feature);
     }
     constexpr auto function_unit_minimum_abi = (1U << 16U) | 11U;
-    if (std::ranges::find(artifact.required_features,
-                          std::uint32_t(LE_FEATURE_FUNCTION_UNIT)) !=
+    if (std::ranges::find(artifact.required_features, std::uint32_t(LE_FEATURE_FUNCTION_UNIT)) !=
             artifact.required_features.end() &&
         artifact.minimum_abi_version < function_unit_minimum_abi) {
         fail(ErrorKind::invalid, "function-unit models must require runtime ABI 1.11 or newer");
+    }
+    constexpr auto sentence_feature_minimum_abi = (1U << 16U) | 12U;
+    constexpr std::array sentence_features{
+        std::uint32_t(LE_FEATURE_UNIT_POSITION),
+        std::uint32_t(LE_FEATURE_SENTENCE_PROGRESS),
+        std::uint32_t(LE_FEATURE_SENTENCE_UNIT_COUNT),
+    };
+    if (std::ranges::any_of(sentence_features,
+                            [&](std::uint32_t feature) {
+                                return std::ranges::find(artifact.required_features, feature) !=
+                                       artifact.required_features.end();
+                            }) &&
+        artifact.minimum_abi_version < sentence_feature_minimum_abi) {
+        fail(ErrorKind::invalid, "sentence-context models must require runtime ABI 1.12 or newer");
     }
     if (artifact.type == LE_MODEL_PREFIX) {
         if (artifact.prefix_strategy != LE_PREFIX_PROPORTIONAL &&
@@ -183,7 +199,8 @@ void validate_metadata(const Artifact& artifact) {
             artifact.required_features.end()) {
             fail(ErrorKind::invalid, "lexical-core model does not declare its required feature");
         }
-    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE) {
+    } else if (artifact.type == LE_MODEL_LINEAR_SALIENCE ||
+               artifact.type == LE_MODEL_SEGMENTAL_SALIENCE) {
         constexpr auto minimum_linear_abi = (1U << 16U) | 6U;
         if (artifact.minimum_abi_version < minimum_linear_abi) {
             fail(ErrorKind::invalid, "linear salience model minimum ABI predates model support");
@@ -194,24 +211,51 @@ void validate_metadata(const Artifact& artifact) {
         if (artifact.linear_weights.empty() || artifact.linear_weights.size() > 256) {
             fail(ErrorKind::invalid, "linear salience model weight count is invalid");
         }
-        std::vector<std::uint32_t> weighted_features;
-        for (const auto& item : artifact.linear_weights) {
-            if (!known_feature(item.feature)) {
-                fail(ErrorKind::incompatible,
-                     "linear salience model uses an unsupported feature identifier");
+        const auto validate_weights = [&](const std::vector<Artifact::FeatureWeight>& weights,
+                                          std::string_view label) {
+            std::vector<std::uint32_t> weighted_features;
+            for (const auto& item : weights) {
+                if (!known_feature(item.feature)) {
+                    fail(ErrorKind::incompatible,
+                         "salience model uses an unsupported feature identifier");
+                }
+                if (!std::isfinite(item.weight)) {
+                    fail(ErrorKind::invalid, std::string(label) + " contains a non-finite weight");
+                }
+                if (std::ranges::find(weighted_features, item.feature) != weighted_features.end()) {
+                    fail(ErrorKind::invalid, std::string(label) + " contains a duplicate weight");
+                }
+                if (std::ranges::find(artifact.required_features, item.feature) ==
+                    artifact.required_features.end()) {
+                    fail(ErrorKind::invalid,
+                         std::string(label) + " weight is absent from required features");
+                }
+                weighted_features.push_back(item.feature);
             }
-            if (!std::isfinite(item.weight)) {
-                fail(ErrorKind::invalid, "linear salience model contains a non-finite weight");
+        };
+        validate_weights(artifact.linear_weights, "linear salience model");
+        if (artifact.type == LE_MODEL_SEGMENTAL_SALIENCE) {
+            constexpr auto minimum_segmental_abi = (1U << 16U) | 12U;
+            if (artifact.minimum_abi_version < minimum_segmental_abi) {
+                fail(ErrorKind::invalid,
+                     "segmental salience model minimum ABI predates model support");
             }
-            if (std::ranges::find(weighted_features, item.feature) != weighted_features.end()) {
-                fail(ErrorKind::invalid, "linear salience model contains a duplicate weight");
-            }
-            if (std::ranges::find(artifact.required_features, item.feature) ==
+            if (std::ranges::find(artifact.required_features,
+                                  std::uint32_t(LE_FEATURE_LEXICAL_CORE)) ==
                 artifact.required_features.end()) {
                 fail(ErrorKind::invalid,
-                     "linear salience model weight is absent from required features");
+                     "segmental salience model does not declare lexical-core support");
             }
-            weighted_features.push_back(item.feature);
+            if (!std::isfinite(artifact.segmental_anchor_bias) ||
+                artifact.segmental_anchor_weights.empty() ||
+                artifact.segmental_anchor_weights.size() > 256) {
+                fail(ErrorKind::invalid, "segmental anchor predictor is invalid");
+            }
+            if (artifact.segmental_minimum_graphemes == 0 ||
+                artifact.segmental_minimum_graphemes > 16) {
+                fail(ErrorKind::invalid, "segmental minimum grapheme count is invalid");
+            }
+            validate_weights(artifact.segmental_anchor_weights, "segmental anchor model");
         }
     } else {
         fail(ErrorKind::incompatible, "model type is not supported by this runtime");
@@ -275,7 +319,10 @@ Artifact load(std::span<const std::uint8_t> bytes) {
                       1,
                       0.5F,
                       0.0F,
-                      {}};
+                      {},
+                      0.5F,
+                      {},
+                      1};
     std::size_t cursor = languages_offset;
     artifact.languages.reserve(language_count);
     for (std::uint32_t index = 0; index < language_count; ++index) {
@@ -325,6 +372,39 @@ Artifact load(std::span<const std::uint8_t> bytes) {
                 read_u32(bytes, cursor), bits_float(read_u32(bytes, cursor + 4))});
             cursor += 8;
         }
+    } else if (artifact.type == LE_MODEL_SEGMENTAL_SALIENCE) {
+        if (parameter_count < 10 || parameter_count % 2 != 0) {
+            fail(ErrorKind::invalid, "segmental salience model parameter count is invalid");
+        }
+        artifact.linear_bias = bits_float(read_u32(bytes, cursor));
+        const auto salience_count = read_u32(bytes, cursor + 4);
+        if (salience_count == 0 || salience_count > 256) {
+            fail(ErrorKind::invalid, "segmental salience weight count is invalid");
+        }
+        cursor += 8;
+        artifact.linear_weights.reserve(salience_count);
+        for (std::uint32_t index = 0; index < salience_count; ++index) {
+            artifact.linear_weights.push_back(Artifact::FeatureWeight{
+                read_u32(bytes, cursor), bits_float(read_u32(bytes, cursor + 4))});
+            cursor += 8;
+        }
+        artifact.segmental_anchor_bias = bits_float(read_u32(bytes, cursor));
+        const auto anchor_count = read_u32(bytes, cursor + 4);
+        if (anchor_count == 0 || anchor_count > 256 ||
+            parameter_count != 6 + 2 * salience_count + 2 * anchor_count) {
+            fail(ErrorKind::invalid, "segmental anchor weight table is invalid");
+        }
+        cursor += 8;
+        artifact.segmental_anchor_weights.reserve(anchor_count);
+        for (std::uint32_t index = 0; index < anchor_count; ++index) {
+            artifact.segmental_anchor_weights.push_back(Artifact::FeatureWeight{
+                read_u32(bytes, cursor), bits_float(read_u32(bytes, cursor + 4))});
+            cursor += 8;
+        }
+        artifact.segmental_minimum_graphemes = read_u32(bytes, cursor);
+        if (read_u32(bytes, cursor + 4) != 0) {
+            fail(ErrorKind::incompatible, "segmental salience model uses unsupported flags");
+        }
     }
     validate_metadata(artifact);
     return artifact;
@@ -336,6 +416,9 @@ std::vector<std::uint8_t> encode(const Artifact& artifact) {
         artifact.type == LE_MODEL_PREFIX ? 3U
         : artifact.type == LE_MODEL_LINEAR_SALIENCE
             ? static_cast<std::uint32_t>(2 + 2 * artifact.linear_weights.size())
+        : artifact.type == LE_MODEL_SEGMENTAL_SALIENCE
+            ? static_cast<std::uint32_t>(6 + 2 * artifact.linear_weights.size() +
+                                         2 * artifact.segmental_anchor_weights.size())
             : 0U;
     std::vector<std::uint8_t> bytes(magic.begin(), magic.end());
     write_u16(bytes, LE_MODEL_FORMAT_VERSION_MAJOR);
@@ -376,6 +459,21 @@ std::vector<std::uint8_t> encode(const Artifact& artifact) {
             write_u32(bytes, item.feature);
             write_u32(bytes, float_bits(item.weight));
         }
+    } else if (artifact.type == LE_MODEL_SEGMENTAL_SALIENCE) {
+        write_u32(bytes, float_bits(artifact.linear_bias));
+        write_u32(bytes, static_cast<std::uint32_t>(artifact.linear_weights.size()));
+        for (const auto& item : artifact.linear_weights) {
+            write_u32(bytes, item.feature);
+            write_u32(bytes, float_bits(item.weight));
+        }
+        write_u32(bytes, float_bits(artifact.segmental_anchor_bias));
+        write_u32(bytes, static_cast<std::uint32_t>(artifact.segmental_anchor_weights.size()));
+        for (const auto& item : artifact.segmental_anchor_weights) {
+            write_u32(bytes, item.feature);
+            write_u32(bytes, float_bits(item.weight));
+        }
+        write_u32(bytes, artifact.segmental_minimum_graphemes);
+        write_u32(bytes, 0);
     }
     if (bytes.size() > maximum_artifact_size ||
         bytes.size() > std::numeric_limits<std::uint32_t>::max()) {

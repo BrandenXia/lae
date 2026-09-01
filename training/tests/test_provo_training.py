@@ -3,18 +3,23 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import struct
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from lae_training.dataset import DatasetError
-from lae_training.artifacts import build_linear_salience_artifact
+from lae_training.artifacts import (
+    build_linear_salience_artifact,
+    build_segmental_salience_artifact,
+)
 from lae_training.provo import (
     FEATURE_FUNCTION_UNIT,
     FEATURE_GRAPHEME_COUNT,
     load_provo_corpus,
     train_provo_model,
+    train_provo_segmental_model,
 )
 from lae_training.salience_dataset import SalienceFeature, SalienceUnit
 
@@ -30,6 +35,9 @@ class ProvoTrainingTests(unittest.TestCase):
             "Word_Cleaned",
             "IA_ID",
             "IA_SKIP",
+            "IA_LEFT",
+            "IA_RIGHT",
+            "IA_FIRST_FIXATION_X",
         )
         words = (
             (1, "the", (0, 1)),
@@ -63,6 +71,9 @@ class ProvoTrainingTests(unittest.TestCase):
                             "Word_Cleaned": word,
                             "IA_ID": passage_positions[passage_id],
                             "IA_SKIP": skip,
+                            "IA_LEFT": 100,
+                            "IA_RIGHT": 200,
+                            "IA_FIRST_FIXATION_X": 145 + word_id,
                         }
                     )
         return path
@@ -115,6 +126,17 @@ class ProvoTrainingTests(unittest.TestCase):
             with self.assertRaisesRegex(DatasetError, "SHA-256 mismatch"):
                 load_provo_corpus(path, "unused")
 
+    def test_trains_segmental_fixation_and_anchor_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._dataset(directory)
+            with patch("lae_training.provo._analyze_words", self._runtime_units):
+                result = train_provo_segmental_model(
+                    path, "unused", folds=2, expected_sha256=None
+                )
+        self.assertEqual(struct.unpack_from("<I", result.artifact, 28)[0], 4)
+        self.assertEqual(result.report["data"]["landing_observation_count"], 12)
+        self.assertIn("anchor", result.report["evaluation"])
+
     def test_checked_in_release_matches_its_report(self) -> None:
         root = Path(__file__).parents[2]
         artifact = (root / "models" / "lae-provo-fixation-v1.lem").read_bytes()
@@ -130,6 +152,36 @@ class ProvoTrainingTests(unittest.TestCase):
                 (weight["feature_id"], weight["weight"])
                 for weight in model["weights"]
             ),
+            languages=(model["language"],),
+            model_version=model["model_version"],
+        )
+        self.assertEqual(artifact, rebuilt)
+        self.assertEqual(
+            hashlib.sha256(artifact).hexdigest(), report["artifact"]["sha256"]
+        )
+
+    def test_checked_in_segmental_release_matches_its_report(self) -> None:
+        root = Path(__file__).parents[2]
+        artifact = (root / "models" / "lae-provo-segmental-v1.lem").read_bytes()
+        report = json.loads(
+            (root / "models" / "lae-provo-segmental-v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        model = report["model"]
+
+        def weights(section):
+            return tuple(
+                (weight["feature_id"], weight["weight"])
+                for weight in section["weights"]
+            )
+
+        rebuilt = build_segmental_salience_artifact(
+            model["salience"]["bias"],
+            weights(model["salience"]),
+            model["anchor"]["bias"],
+            weights(model["anchor"]),
+            minimum_graphemes=model["minimum_graphemes"],
             languages=(model["language"],),
             model_version=model["model_version"],
         )

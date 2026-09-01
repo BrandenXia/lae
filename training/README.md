@@ -61,6 +61,9 @@ PYTHONPATH=training/src python3 -m lae_training \
 PYTHONPATH=training/src python3 -m lae_training train-provo \
   Provo_Corpus-Eyetracking_Data.csv provo.lem \
   --analyzer build/le-cli --report provo.json
+PYTHONPATH=training/src python3 -m lae_training train-provo-segmental \
+  Provo_Corpus-Eyetracking_Data.csv segmental.lem \
+  --analyzer build/le-cli --report segmental.json
 ```
 
 `fit-prefix` emits a JSON report and a runtime-loadable artifact. With no
@@ -96,3 +99,8 @@ records every candidate, source attribution and checksum, held-out metrics,
 binary32 parameters, and artifact checksum. Raw participant records are never
 written to the repository or artifact. See the released
 [model card](../docs/models/provo-fixation-v1.md).
+
+`train-provo-segmental` additionally aggregates 124,158 compatible normalized
+first-fixation landing positions, selects an independent anchor predictor on
+the same passage folds, and exports `LE_MODEL_SEGMENTAL_SALIENCE`. See the
+[segmental model card](../docs/models/provo-segmental-v1.md).

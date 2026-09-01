@@ -34,13 +34,16 @@ each caller-supplied partition element. Provider nodes remain generic and are
 merged under the document root with document-relative spans, so existing
 reading models consume single- and mixed-language analyses identically.
 
-The stable features defined through ABI 1.11 are:
+The stable features defined through ABI 1.12 are:
 
 | Identifier | Meaning |
 |---|---|
 | `LE_FEATURE_BOUNDARY_STRENGTH` | normalized structural boundary signal |
 | `LE_FEATURE_GRAPHEME_COUNT` | node grapheme count |
 | `LE_FEATURE_SEGMENTATION_CONFIDENCE` | provider confidence in a segmentation decision |
+| `LE_FEATURE_UNIT_POSITION` | one-based unit position within its sentence |
+| `LE_FEATURE_SENTENCE_PROGRESS` | normalized unit progress from sentence start to end |
+| `LE_FEATURE_SENTENCE_UNIT_COUNT` | number of units in the containing sentence |
 | `LE_FEATURE_LEXICAL_CORE` | provider identifies a node as a lexical core |
 | `LE_FEATURE_DERIVATIONAL_AFFIX` | provider identifies a derivational affix |
 | `LE_FEATURE_GRAMMATICAL_AFFIX` | provider identifies a grammatical affix |

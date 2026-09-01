@@ -27,6 +27,12 @@ It emits the clamped prediction in both fixation and lexical channels and skips
 zero predictions. It does not inspect language-specific feature meanings;
 language metadata on the artifact limits where fitted weights may run.
 
+The segmental-salience model adds a second learned output for normalized
+first-fixation progress. It prefers a strict provider-supplied lexical core;
+when analysis has no strict core, it converts the predicted anchor into a
+partial grapheme prefix. Both paths emit the same presentation-neutral signal
+shape, so renderers and policies require no special segmental API.
+
 The same two models can be loaded from `.lem` artifacts. Prefix artifacts move
 strategy, fixed-count, and proportion parameters out of the runtime call site.
 Lexical-core artifacts declare `LE_FEATURE_LEXICAL_CORE` as a required runtime

@@ -6,6 +6,7 @@ from .artifacts import (
     build_lexical_core_artifact,
     build_linear_salience_artifact,
     build_prefix_artifact,
+    build_segmental_salience_artifact,
     write_artifact,
 )
 from .dataset import Dataset, DatasetError, JsonlDataset, TrainingExample, UnitTarget
@@ -42,7 +43,14 @@ from .salience_dataset import (
     SalienceJsonlDataset,
     SalienceUnit,
 )
-from .provo import ProvoCorpus, ProvoTrainingResult, load_provo_corpus, train_provo_model
+from .provo import (
+    ProvoCorpus,
+    ProvoSegmentalTrainingResult,
+    ProvoTrainingResult,
+    load_provo_corpus,
+    train_provo_model,
+    train_provo_segmental_model,
+)
 
 __all__ = [
     "ABI_VERSION",
@@ -61,6 +69,7 @@ __all__ = [
     "PlanRecord",
     "LinearSalienceMetrics",
     "ProvoCorpus",
+    "ProvoSegmentalTrainingResult",
     "ProvoTrainingResult",
     "SalienceExample",
     "SalienceFeature",
@@ -76,6 +85,7 @@ __all__ = [
     "build_lexical_core_artifact",
     "build_linear_salience_artifact",
     "build_prefix_artifact",
+    "build_segmental_salience_artifact",
     "aggregate_plans",
     "aggregate_study",
     "compare_plans",
@@ -88,5 +98,6 @@ __all__ = [
     "linear_salience_metrics",
     "load_provo_corpus",
     "train_provo_model",
+    "train_provo_segmental_model",
     "write_artifact",
 ]

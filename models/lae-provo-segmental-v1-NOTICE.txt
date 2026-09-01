@@ -1,0 +1,22 @@
+LAE Provo Segmental v1 — data and model notice
+
+This model was trained from The Provo Corpus: A Large Eye-Tracking Corpus
+with Predictability Norms, created by Steven G. Luke and Kiel Christianson.
+
+Project: https://osf.io/sjefs/
+Paper: https://doi.org/10.3758/s13428-017-0908-4
+Dataset license: Creative Commons Attribution 4.0 International
+License text: https://creativecommons.org/licenses/by/4.0/
+
+Source file: Provo_Corpus-Eyetracking_Data.csv
+Source SHA-256:
+38aedcb29bc9171009916eb2bcc2375729f104a2a1005c64a563da94b611b9e7
+
+LAE aggregates participant observations by word and trains passage-grouped
+linear predictors for (1) fixation probability and (2) normalized horizontal
+first-fixation landing position. The runtime projects those predictions onto
+provider-supplied lexical-core subunits or a learned partial prefix. The raw
+corpus and participant-level records are not redistributed.
+
+The LAE implementation and model packaging are distributed under the MIT
+License. This notice does not alter the license of the source dataset.

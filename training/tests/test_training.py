@@ -120,7 +120,7 @@ class ArtifactTests(unittest.TestCase):
         checksum_input = bytearray(artifact)
         struct.pack_into("<I", checksum_input, 20, 0)
         self.assertEqual(zlib.crc32(checksum_input) & 0xFFFFFFFF, 0xD2630AD7)
-        self.assertEqual(struct.unpack_from("<I", artifact, 24)[0], ABI_VERSION)
+        self.assertEqual(struct.unpack_from("<I", artifact, 24)[0], (1 << 16) | 11)
 
     def test_lexical_core_encoder_declares_required_feature(self) -> None:
         artifact = build_lexical_core_artifact(languages=("en",), model_version=3)

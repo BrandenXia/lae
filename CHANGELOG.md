@@ -8,6 +8,36 @@ model artifact format.
 
 No changes yet.
 
+## [0.16.0] - 2026-08-31
+
+### Added
+
+- `LE_MODEL_SEGMENTAL_SALIENCE`, combining learned word fixation probability
+  with learned within-word first-fixation position in a 148-byte artifact.
+- `lae-provo-segmental-v1.lem`, trained from 124,158 compatible first-fixation
+  observations in the CC BY 4.0 Provo Corpus.
+- Stable unit-position, sentence-progress, and sentence-unit-count IR features.
+- Partial-word Markdown example and complete segmental model card.
+
+### Improved
+
+- English morphology recognizes layered derivational and grammatical affixes
+  while preserving exact grapheme-safe source spans.
+
+### Validated
+
+- Held-out fixation RMSE is 0.11717, 48.47% below the passage-fold mean
+  baseline; held-out landing-position RMSE is 0.09146 of word width, 6.59%
+  below its baseline.
+
+### Compatibility
+
+- Runtime and Python binding: 0.16.0.
+- C ABI: 1.12.
+- Provider ABI: 1.0 (unchanged).
+- Model artifact format: 1.0 (unchanged).
+- Python training package: 0.6.0.
+
 ## [0.15.0] - 2026-08-31
 
 ### Added

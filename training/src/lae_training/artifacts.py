@@ -15,13 +15,18 @@ MAGIC = b"LAEMODL\0"
 FORMAT_VERSION = (1, 0)
 HEADER_SIZE = 64
 MAXIMUM_ARTIFACT_SIZE = 16 * 1024 * 1024
-ABI_VERSION = (1 << 16) | 11
+ABI_VERSION = (1 << 16) | 12
+BASELINE_MODEL_ABI = (1 << 16) | 11
 MODEL_PREFIX = 1
 MODEL_LEXICAL_CORE = 2
 MODEL_LINEAR_SALIENCE = 3
+MODEL_SEGMENTAL_SALIENCE = 4
 LINEAR_SALIENCE_MINIMUM_ABI = (1 << 16) | 6
 FEATURE_LEXICAL_CORE = 0x00010001
 FEATURE_FUNCTION_UNIT = 0x00030002
+FEATURE_UNIT_POSITION = 0x00000004
+FEATURE_SENTENCE_PROGRESS = 0x00000005
+FEATURE_SENTENCE_UNIT_COUNT = 0x00000006
 PREFIX_PROPORTIONAL = 1
 PREFIX_FIXED = 2
 
@@ -85,6 +90,15 @@ def _encode(
         raise ValueError("required features must be unique and contain at most 256 entries")
     if FEATURE_FUNCTION_UNIT in required_features and minimum_abi < ((1 << 16) | 11):
         raise ValueError("function-unit models must require runtime ABI 1.11 or newer")
+    if any(
+        feature in required_features
+        for feature in (
+            FEATURE_UNIT_POSITION,
+            FEATURE_SENTENCE_PROGRESS,
+            FEATURE_SENTENCE_UNIT_COUNT,
+        )
+    ) and minimum_abi < ((1 << 16) | 12):
+        raise ValueError("sentence-context models must require runtime ABI 1.12 or newer")
     language_table = b"".join(
         struct.pack("<H", len(language.encode("ascii"))) + language.encode("ascii")
         for language in language_values
@@ -126,7 +140,7 @@ def build_prefix_artifact(
     *,
     languages: Iterable[str] = (),
     model_version: int = 1,
-    minimum_abi: int = ABI_VERSION,
+    minimum_abi: int = BASELINE_MODEL_ABI,
 ) -> bytes:
     """Compile fitted prefix parameters into a runtime-loadable artifact."""
 
@@ -150,7 +164,7 @@ def build_lexical_core_artifact(
     *,
     languages: Iterable[str] = (),
     model_version: int = 1,
-    minimum_abi: int = ABI_VERSION,
+    minimum_abi: int = BASELINE_MODEL_ABI,
 ) -> bytes:
     """Compile a lexical-core model descriptor for the current runtime."""
 
@@ -170,13 +184,10 @@ def build_linear_salience_artifact(
     *,
     languages: Iterable[str] = (),
     model_version: int = 1,
-    minimum_abi: int = ABI_VERSION,
+    minimum_abi: int | None = None,
 ) -> bytes:
     """Compile a linear unit-salience predictor into artifact format v1."""
 
-    minimum_abi = _u32(minimum_abi, "minimum_abi")
-    if minimum_abi < LINEAR_SALIENCE_MINIMUM_ABI:
-        raise ValueError("linear model minimum ABI must be at least 1.6")
     bias = _binary32(bias, "linear bias")
     values: list[tuple[int, float]] = []
     seen: set[int] = set()
@@ -188,6 +199,20 @@ def build_linear_salience_artifact(
         values.append((feature, _binary32(weight, f"weight for feature {feature}")))
     if not values or len(values) > 256:
         raise ValueError("linear model must contain between 1 and 256 weights")
+    if minimum_abi is None:
+        sentence_features = {
+            FEATURE_UNIT_POSITION,
+            FEATURE_SENTENCE_PROGRESS,
+            FEATURE_SENTENCE_UNIT_COUNT,
+        }
+        minimum_abi = (
+            ABI_VERSION
+            if any(feature in sentence_features for feature, _ in values)
+            else BASELINE_MODEL_ABI
+        )
+    minimum_abi = _u32(minimum_abi, "minimum_abi")
+    if minimum_abi < LINEAR_SALIENCE_MINIMUM_ABI:
+        raise ValueError("linear model minimum ABI must be at least 1.6")
     parameters = struct.pack("<fI", bias, len(values)) + b"".join(
         struct.pack("<If", feature, weight) for feature, weight in values
     )
@@ -197,6 +222,73 @@ def build_linear_salience_artifact(
         minimum_abi=minimum_abi,
         languages=languages,
         required_features=tuple(feature for feature, _ in values),
+        parameters=parameters,
+    )
+
+
+def build_segmental_salience_artifact(
+    salience_bias: float,
+    salience_weights: Iterable[tuple[int, float]],
+    anchor_bias: float,
+    anchor_weights: Iterable[tuple[int, float]],
+    *,
+    minimum_graphemes: int = 1,
+    languages: Iterable[str] = (),
+    model_version: int = 1,
+    minimum_abi: int = ABI_VERSION,
+) -> bytes:
+    """Compile learned unit salience and within-unit fixation anchors."""
+
+    minimum_abi = _u32(minimum_abi, "minimum_abi")
+    if minimum_abi < ((1 << 16) | 12):
+        raise ValueError("segmental model minimum ABI must be at least 1.12")
+    minimum_graphemes = _u32(
+        minimum_graphemes, "minimum_graphemes", nonzero=True
+    )
+    if minimum_graphemes > 16:
+        raise ValueError("minimum_graphemes must not exceed 16")
+
+    def prepare(
+        values: Iterable[tuple[int, float]], label: str
+    ) -> tuple[tuple[int, float], ...]:
+        result: list[tuple[int, float]] = []
+        seen: set[int] = set()
+        for feature, weight in values:
+            feature = _u32(feature, f"{label} feature")
+            if feature in seen:
+                raise ValueError(f"duplicate {label} feature: {feature}")
+            seen.add(feature)
+            result.append((feature, _binary32(weight, f"{label} weight {feature}")))
+        if not result or len(result) > 256:
+            raise ValueError(f"{label} must contain between 1 and 256 weights")
+        return tuple(result)
+
+    salience_values = prepare(salience_weights, "salience")
+    anchor_values = prepare(anchor_weights, "anchor")
+    salience_bias = _binary32(salience_bias, "salience bias")
+    anchor_bias = _binary32(anchor_bias, "anchor bias")
+    parameters = (
+        struct.pack("<fI", salience_bias, len(salience_values))
+        + b"".join(struct.pack("<If", feature, weight) for feature, weight in salience_values)
+        + struct.pack("<fI", anchor_bias, len(anchor_values))
+        + b"".join(struct.pack("<If", feature, weight) for feature, weight in anchor_values)
+        + struct.pack("<II", minimum_graphemes, 0)
+    )
+    required = tuple(
+        dict.fromkeys(
+            [
+                *(feature for feature, _ in salience_values),
+                *(feature for feature, _ in anchor_values),
+                FEATURE_LEXICAL_CORE,
+            ]
+        )
+    )
+    return _encode(
+        model_type=MODEL_SEGMENTAL_SALIENCE,
+        model_version=model_version,
+        minimum_abi=minimum_abi,
+        languages=languages,
+        required_features=required,
         parameters=parameters,
     )
 

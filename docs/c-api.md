@@ -26,6 +26,9 @@ ABI 1.10 adds `le_process_regions` and `le_process_regions_with_model` for
 high-level explicit-region processing.
 ABI 1.11 adds the stable `LE_FEATURE_FUNCTION_UNIT` identifier without changing
 any public structure layout or function signature.
+ABI 1.12 adds the `LE_MODEL_SEGMENTAL_SALIENCE` artifact type and stable unit
+position, sentence progress, and sentence unit count features without changing
+any public function or structure layout.
 
 ## Function contracts
 
@@ -85,6 +88,9 @@ treats a primary capability such as `en` as supporting `en-US`.
 `LE_MODEL_LINEAR_SALIENCE` evaluates artifact weights against stable features
 on each `LE_NODE_UNIT`. Missing features contribute zero; positive clamped
 predictions become fixation and lexical salience signals over the unit span.
+`LE_MODEL_SEGMENTAL_SALIENCE` adds a learned within-unit anchor predictor and
+projects positive salience onto a strict lexical core or a grapheme-safe partial
+prefix. The result still uses the same immutable signal and emphasis arrays.
 
 ## Processing options
 
@@ -135,6 +141,8 @@ IDs must be preserved or ignored rather than treated as errors by consumers.
 ABI 1.8 adds stable Hiragana and Katakana script features.
 ABI 1.11 adds the complementary function-unit semantic feature; providers may
 omit both content and function classification when confidence is insufficient.
+ABI 1.12 adds unit position (one-based within its sentence), normalized sentence
+progress, and sentence unit count.
 
 Feature namespaces begin at `0x00000000` (core), `0x00010000` (morphology),
 `0x00020000` (syntax), `0x00030000` (semantic), `0x00040000` (script), and

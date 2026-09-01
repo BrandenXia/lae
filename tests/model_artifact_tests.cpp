@@ -53,8 +53,19 @@ void expect_error(const std::vector<std::uint8_t>& bytes, le::model::ErrorKind k
 } // namespace
 
 int main() {
-    const le::model::Artifact prefix{
-        LE_ABI_VERSION, LE_MODEL_PREFIX, 7, {"en", "zh"}, {}, LE_PREFIX_FIXED, 2, 0.5F, 0.0F, {}};
+    const le::model::Artifact prefix{(1U << 16U) | 11U,
+                                     LE_MODEL_PREFIX,
+                                     7,
+                                     {"en", "zh"},
+                                     {},
+                                     LE_PREFIX_FIXED,
+                                     2,
+                                     0.5F,
+                                     0.0F,
+                                     {},
+                                     0.5F,
+                                     {},
+                                     1};
     const auto prefix_bytes = le::model::encode(prefix);
     check(prefix_bytes.size() == 84, "prefix fixture has stable encoded size");
     check(std::string_view(reinterpret_cast<const char*>(prefix_bytes.data()), 7) == "LAEMODL",
@@ -90,6 +101,9 @@ int main() {
         0.5F,
         0.0F,
         {},
+        0.5F,
+        {},
+        1,
     };
     const auto lexical_bytes = le::model::encode(lexical);
     check(lexical_bytes.size() == 76, "lexical fixture has stable encoded size");
@@ -108,6 +122,9 @@ int main() {
         0.5F,
         0.1F,
         {{LE_FEATURE_GRAPHEME_COUNT, 0.2F}, {LE_FEATURE_SCRIPT_LATIN, 0.3F}},
+        0.5F,
+        {},
+        1,
     };
     const auto linear_bytes = le::model::encode(linear);
     check(linear_bytes.size() == 100, "linear salience fixture has stable encoded size");
@@ -120,6 +137,42 @@ int main() {
               loaded_linear.linear_weights[1].weight == 0.3F,
           "linear salience parameters round trip");
 
+    const le::model::Artifact segmental{
+        LE_ABI_VERSION,
+        LE_MODEL_SEGMENTAL_SALIENCE,
+        1,
+        {"en"},
+        {LE_FEATURE_GRAPHEME_COUNT, LE_FEATURE_FUNCTION_UNIT, LE_FEATURE_LEXICAL_CORE},
+        LE_PREFIX_PROPORTIONAL,
+        1,
+        0.5F,
+        0.3F,
+        {{LE_FEATURE_GRAPHEME_COUNT, 0.05F}, {LE_FEATURE_FUNCTION_UNIT, -0.1F}},
+        0.55F,
+        {{LE_FEATURE_GRAPHEME_COUNT, -0.01F}},
+        1,
+    };
+    const auto segmental_bytes = le::model::encode(segmental);
+    const auto loaded_segmental = le::model::load(segmental_bytes);
+    check(loaded_segmental.type == LE_MODEL_SEGMENTAL_SALIENCE &&
+              loaded_segmental.linear_weights.size() == 2 &&
+              loaded_segmental.segmental_anchor_weights.size() == 1,
+          "segmental salience predictors round trip");
+    check(loaded_segmental.segmental_anchor_bias == 0.55F &&
+              loaded_segmental.segmental_minimum_graphemes == 1 &&
+              le::model::encode(loaded_segmental) == segmental_bytes,
+          "segmental parameters encode deterministically");
+
+    try {
+        auto old_segmental = segmental;
+        old_segmental.minimum_abi_version = (1U << 16U) | 11U;
+        static_cast<void>(le::model::encode(old_segmental));
+        check(false, "segmental model cannot claim a pre-1.12 ABI");
+    } catch (const le::model::ArtifactError& error) {
+        check(error.kind() == le::model::ErrorKind::invalid,
+              "segmental model cannot claim a pre-1.12 ABI");
+    }
+
     const le::model::Artifact japanese_linear{
         LE_ABI_VERSION,
         LE_MODEL_LINEAR_SALIENCE,
@@ -131,6 +184,9 @@ int main() {
         0.5F,
         0.0F,
         {{LE_FEATURE_SCRIPT_HIRAGANA, 0.2F}, {LE_FEATURE_SCRIPT_KATAKANA, 0.3F}},
+        0.5F,
+        {},
+        1,
     };
     const auto loaded_japanese_linear = le::model::load(le::model::encode(japanese_linear));
     check(loaded_japanese_linear.required_features ==
@@ -144,6 +200,18 @@ int main() {
     check(loaded_function_linear.required_features ==
               std::vector<std::uint32_t>{LE_FEATURE_FUNCTION_UNIT},
           "ABI 1.11 function-unit feature is artifact-compatible");
+
+    try {
+        auto old_sentence_linear = linear;
+        old_sentence_linear.minimum_abi_version = (1U << 16U) | 11U;
+        old_sentence_linear.required_features = {LE_FEATURE_SENTENCE_PROGRESS};
+        old_sentence_linear.linear_weights = {{LE_FEATURE_SENTENCE_PROGRESS, -0.1F}};
+        static_cast<void>(le::model::encode(old_sentence_linear));
+        check(false, "sentence-context model cannot claim a pre-1.12 ABI");
+    } catch (const le::model::ArtifactError& error) {
+        check(error.kind() == le::model::ErrorKind::invalid,
+              "sentence-context model cannot claim a pre-1.12 ABI");
+    }
 
     auto corrupted = prefix_bytes;
     corrupted.back() ^= 0x01U;

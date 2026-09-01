@@ -4,7 +4,10 @@ import struct
 import unittest
 from pathlib import Path
 
-from lae_training.artifacts import build_linear_salience_artifact
+from lae_training.artifacts import (
+    build_linear_salience_artifact,
+    build_segmental_salience_artifact,
+)
 from lae_training.dataset import DatasetError
 from lae_training.linear_salience import fit_linear_salience
 from lae_training.salience_dataset import SalienceJsonlDataset, parse_salience_record
@@ -128,6 +131,37 @@ class LinearSalienceTrainingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "1.11"):
             build_linear_salience_artifact(
                 0.0, ((0x00030002, -0.4),), minimum_abi=(1 << 16) | 10
+            )
+
+    def test_exports_segmental_predictors(self) -> None:
+        artifact = build_segmental_salience_artifact(
+            0.3,
+            ((2, 0.05), (0x00030002, -0.1)),
+            0.55,
+            ((2, -0.01),),
+            languages=("en",),
+        )
+        self.assertEqual(struct.unpack_from("<I", artifact, 28)[0], 4)
+        self.assertEqual(struct.unpack_from("<I", artifact, 24)[0], (1 << 16) | 12)
+        required_count = struct.unpack_from("<I", artifact, 40)[0]
+        self.assertEqual(required_count, 3)
+
+    def test_segmental_export_requires_current_abi(self) -> None:
+        with self.assertRaisesRegex(ValueError, "1.12"):
+            build_segmental_salience_artifact(
+                0.3,
+                ((2, 0.05),),
+                0.5,
+                ((2, -0.01),),
+                minimum_abi=(1 << 16) | 11,
+            )
+
+    def test_sentence_context_feature_requires_abi_1_12(self) -> None:
+        with self.assertRaisesRegex(ValueError, "1.12"):
+            build_linear_salience_artifact(
+                0.0,
+                ((0x00000005, -0.1),),
+                minimum_abi=(1 << 16) | 11,
             )
 
 

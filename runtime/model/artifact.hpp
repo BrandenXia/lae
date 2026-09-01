@@ -43,6 +43,9 @@ struct Artifact {
         float weight;
     };
     std::vector<FeatureWeight> linear_weights;
+    float segmental_anchor_bias = 0.5F;
+    std::vector<FeatureWeight> segmental_anchor_weights;
+    std::uint32_t segmental_minimum_graphemes = 1;
 };
 
 [[nodiscard]] Artifact load(std::span<const std::uint8_t> bytes);
